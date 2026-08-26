@@ -9,6 +9,12 @@
     Sa: "Sat",
     Su: "Sun"
   };
+  const SECTION_TYPES = {
+    0: "Lecture",
+    2: "Discussion",
+    4: "Lab",
+    6: "Project"
+  };
 
   function normalize(value) {
     return String(value ?? "")
@@ -37,12 +43,18 @@
 
   function parseCourse(value) {
     const text = normalize(value);
-    const code = text.match(/\b([A-Z&]{2,8}\s*\d{3,4}(?:-\d{3})?)\b/)?.[1] ?? text;
+    const codeMatch = text.match(/\b([A-Z&]{2,8}\s*\d{3,4})(?:-(\d{3}))?\b/);
+    const code = codeMatch?.[1] ?? text;
+    const section = codeMatch?.[2] ?? "";
     const component = text.match(/\b(LEC|DIS|LAB|PRJ|SEM|IND|RSC|FLD|STU)\b/)?.[1] ?? "Class";
     const classNumber = text.match(/\((\d+)\)/)?.[1] ?? "";
+    const type = section ? SECTION_TYPES[section.charAt(0)] ?? "" : "";
 
     return {
       code: code.replace(/\s+/g, " "),
+      id: section ? `${code.replace(/\s+/g, " ")}-${section}` : code.replace(/\s+/g, " "),
+      section,
+      type,
       component,
       classNumber,
       raw: text
@@ -88,7 +100,7 @@
     // override the broader MoWeFr entry for the same class and time.
     const deduped = new Map();
     candidates.forEach((meeting) => {
-      const key = `${meeting.code}|${meeting.day}|${meeting.start}|${meeting.end}`;
+      const key = `${meeting.id}|${meeting.day}|${meeting.start}|${meeting.end}`;
       const current = deduped.get(key);
       if (!current || meeting.specificity <= current.specificity) {
         deduped.set(key, meeting);
@@ -106,8 +118,8 @@
       scheduleText: normalize(row.scheduleText)
     }));
     const meetings = courses.flatMap((course) => parseMeetings(course.scheduleText, course));
-    const scheduledCodes = new Set(meetings.map((meeting) => meeting.code));
-    const unscheduled = courses.filter((course) => !scheduledCodes.has(course.code));
+    const scheduledIds = new Set(meetings.map((meeting) => meeting.id));
+    const unscheduled = courses.filter((course) => !scheduledIds.has(course.id));
 
     const earliest = meetings.length ? Math.min(...meetings.map((meeting) => meeting.start)) : 9 * 60;
     const latest = meetings.length ? Math.max(...meetings.map((meeting) => meeting.end)) : 17 * 60;
@@ -135,4 +147,3 @@
     parseMeetings
   };
 })();
-

@@ -118,6 +118,42 @@
     return null;
   }
 
+  function extractAdvisorNames() {
+    const label = findTextElement("Program Advisor");
+    if (!label) return [];
+
+    let container = label.parentElement;
+    for (let depth = 0; depth < 7 && container; depth += 1) {
+      const hasDetails = [...container.querySelectorAll("a, button, input[type='button']")]
+        .some((candidate) => ownLabel(candidate) === "Details");
+      if (hasDetails) break;
+      container = container.parentElement;
+    }
+
+    if (!container) return [];
+    const sourceDocument = container.ownerDocument;
+    const walker = sourceDocument.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    const names = [];
+    let node = walker.nextNode();
+
+    while (node) {
+      const value = normalize(node.nodeValue).replace(/^Program Advisor\s*/i, "").trim();
+      if (
+        value &&
+        value.length < 100 &&
+        !["Advisor", "Program Advisor", "Details"].includes(value) &&
+        !names.includes(value)
+      ) {
+        names.push(value);
+      }
+      node = walker.nextNode();
+    }
+
+    if (names.length) return names;
+    const fallback = extractLabeledValue("Program Advisor");
+    return fallback ? [fallback] : [];
+  }
+
   function parseFinancialSummary() {
     return globalThis.SCU.homepage.parseFinancialSummary(sourceText());
   }
@@ -275,23 +311,6 @@
     container.append(originalButton);
   }
 
-  function renderHeader(container) {
-    const copy = document.createElement("div");
-    copy.className = "scu-page-heading";
-    copy.innerHTML = "<p>Overview</p><h1>Your week at Cornell</h1><span>Classes, tasks, and enrollment information in one place.</span>";
-    container.append(copy);
-
-    const actions = document.createElement("div");
-    actions.className = "scu-header-actions";
-    const search = createActionButton("Search classes", {
-      className: "scu-primary-button",
-      originalLabel: "Search for Classes"
-    });
-    search.prepend(createIcon("search"));
-    actions.append(search);
-    container.append(actions);
-  }
-
   function renderCalendar(container, schedule) {
     const card = document.createElement("section");
     card.id = "scu-schedule";
@@ -361,7 +380,8 @@
         const code = document.createElement("strong");
         code.textContent = meeting.code;
         const time = document.createElement("span");
-        time.textContent = `${globalThis.SCU.schedule.formatClock(meeting.start)}–${globalThis.SCU.schedule.formatClock(meeting.end)}`;
+        const timeRange = `${globalThis.SCU.schedule.formatClock(meeting.start)}–${globalThis.SCU.schedule.formatClock(meeting.end)}`;
+        time.textContent = meeting.type ? `${meeting.type} · ${timeRange}` : timeRange;
         event.append(code, time);
 
         if (meeting.location) {
@@ -386,46 +406,12 @@
       unscheduled.append(title);
       schedule.unscheduled.forEach((course) => {
         const pill = document.createElement("span");
-        pill.textContent = course.code;
+        pill.textContent = course.type ? `${course.code} · ${course.type}` : course.code;
         unscheduled.append(pill);
       });
       card.append(unscheduled);
     }
 
-    container.append(card);
-  }
-
-  function renderQuickActions(container) {
-    const card = document.createElement("section");
-    card.className = "scu-card";
-    card.innerHTML = '<div class="scu-card-heading"><div><p class="scu-eyebrow">Shortcuts</p><h2>Quick actions</h2></div></div>';
-    const grid = document.createElement("div");
-    grid.className = "scu-quick-grid";
-
-    [
-      ["Enroll", "Add or change classes", "enroll"],
-      ["Plan", "Prepare a future term", "plan"],
-      ["My Academics", "Requirements and history", "academics"],
-      ["Search for Classes", "Explore the course roster", "search"]
-    ].forEach(([label, description, icon]) => {
-      const original = findAction(label);
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "scu-quick-action";
-      button.disabled = !original;
-      button.append(createIcon(icon));
-      const copy = document.createElement("span");
-      const title = document.createElement("strong");
-      title.textContent = label;
-      const detail = document.createElement("small");
-      detail.textContent = description;
-      copy.append(title, detail);
-      button.append(copy, createIcon("arrow"));
-      button.addEventListener("click", () => invokeOriginal(original));
-      grid.append(button);
-    });
-
-    card.append(grid);
     container.append(card);
   }
 
@@ -610,20 +596,25 @@
     card.className = "scu-card scu-advisor-card";
     card.innerHTML = '<div class="scu-card-heading"><div><p class="scu-eyebrow">Support</p><h2>Advisor</h2></div></div>';
 
-    const advisor = extractLabeledValue("Program Advisor");
+    const advisors = extractAdvisorNames();
     const body = document.createElement("div");
     body.className = "scu-advisor-body";
-    const avatar = document.createElement("span");
-    avatar.className = "scu-advisor-avatar";
-    avatar.textContent = advisor ? advisor.charAt(0).toUpperCase() : "A";
-    avatar.setAttribute("aria-hidden", "true");
-    const copy = document.createElement("span");
-    const title = document.createElement("strong");
-    title.textContent = advisor || "Program advisor";
-    const detail = document.createElement("small");
-    detail.textContent = advisor ? "Your assigned advising contact" : "View your advising information";
-    copy.append(title, detail);
-    body.append(avatar, copy);
+    const list = document.createElement("div");
+    list.className = "scu-advisor-list";
+
+    (advisors.length ? advisors : ["Program advisor"]).forEach((advisor) => {
+      const person = document.createElement("div");
+      person.className = "scu-advisor-person";
+      const avatar = document.createElement("span");
+      avatar.className = "scu-advisor-avatar";
+      avatar.textContent = advisor.charAt(0).toUpperCase();
+      avatar.setAttribute("aria-hidden", "true");
+      const name = document.createElement("strong");
+      name.textContent = advisor;
+      person.append(avatar, name);
+      list.append(person);
+    });
+    body.append(list);
 
     const original = findNearbyAction("Program Advisor", "Details");
     const button = document.createElement("button");
@@ -694,16 +685,11 @@
 
     const page = document.createElement("div");
     page.className = "scu-page";
-    const header = document.createElement("header");
-    header.className = "scu-topbar";
-    renderHeader(header);
-
     const content = document.createElement("main");
     content.className = "scu-content";
     const primary = document.createElement("div");
     primary.className = "scu-primary-column";
     renderCalendar(primary, schedule);
-    renderQuickActions(primary);
     renderFinances(primary, financialSummary);
     renderProfile(primary);
 
@@ -716,7 +702,7 @@
     renderResources(secondary);
 
     content.append(primary, secondary);
-    page.append(header, content);
+    page.append(content);
     app.append(nav, page);
     root.append(app);
   }
