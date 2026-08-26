@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Cornell Student Center UI",
   "description": "A cleaner, more usable interface for Cornell Student Center.",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "permissions": ["storage"],
   "host_permissions": [
     "https://studentcenter.cornell.edu/*",
@@ -27,6 +27,7 @@
       "css": ["src/content/styles.css"],
       "js": [
         "src/content/schedule.js",
+        "src/content/homepage-data.js",
         "src/content/dashboard.js",
         "src/content/index.js"
       ],

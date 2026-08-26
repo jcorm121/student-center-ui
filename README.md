@@ -2,6 +2,14 @@
 
 A browser extension that improves the interface of Cornell Student Center while leaving its underlying PeopleSoft behavior intact.
 
+## Homepage upgrade
+
+- Converts the legacy class table into a visual weekly calendar.
+- Surfaces holds, tasks, enrollment dates, advisor information, and Cornell resources.
+- Summarizes account balances and links to the original bursar and financial-aid workflows.
+- Keeps home and campus street addresses off the overview while preserving profile-management links.
+- Provides light, dark, and system themes plus a one-click original view.
+
 ## Run locally
 
 This initial scaffold has no dependencies or build step.
@@ -20,6 +28,7 @@ Run the dependency-free parser test with:
 
 ```sh
 node test/schedule.test.js
+node test/homepage-data.test.js
 ```
 
 Open `test/fixture.html` to preview the dashboard with synthetic data. The fixture intentionally contains no real student information.

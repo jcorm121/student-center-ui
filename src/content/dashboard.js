@@ -36,7 +36,14 @@
   }
 
   function sourceText() {
-    return normalize(sourceDocuments.map((sourceDocument) => sourceDocument.body?.textContent ?? "").join(" "));
+    return normalize(sourceDocuments.map((sourceDocument) => {
+      if (!sourceDocument.body) return "";
+      return [...sourceDocument.body.childNodes]
+        .filter((node) => node !== sourceDocument.getElementById(ROOT_ID))
+        .filter((node) => node !== sourceDocument.getElementById(RETURN_ID))
+        .map((node) => node.textContent ?? "")
+        .join(" ");
+    }).join(" "));
   }
 
   function findAction(label, mode = "exact") {
@@ -45,6 +52,74 @@
       const candidate = ownLabel(element).toLowerCase();
       return mode === "contains" ? candidate.includes(target) : candidate === target;
     }) ?? null;
+  }
+
+  function findTextElement(label) {
+    const target = normalize(label);
+
+    for (const sourceDocument of sourceDocuments) {
+      if (!sourceDocument.body) continue;
+      const walker = sourceDocument.createTreeWalker(
+        sourceDocument.body,
+        NodeFilter.SHOW_TEXT
+      );
+      let node = walker.nextNode();
+
+      while (node) {
+        if (normalize(node.nodeValue) === target && !node.parentElement?.closest(`#${ROOT_ID}`)) {
+          return node.parentElement;
+        }
+        node = walker.nextNode();
+      }
+    }
+
+    return null;
+  }
+
+  function extractLabeledValue(label) {
+    const element = findTextElement(label);
+    if (!element) return "";
+
+    const siblings = [...(element.parentNode?.childNodes ?? [])];
+    const siblingIndex = siblings.indexOf(element);
+    const trailingText = normalize(siblings.slice(siblingIndex + 1)
+      .map((node) => node.textContent ?? "")
+      .join(" "));
+    if (trailingText && trailingText.length < 240) {
+      return trailingText.replace(/\b(?:Details|Edit)\b\s*$/i, "").trim();
+    }
+
+    let container = element;
+    for (let depth = 0; depth < 5 && container; depth += 1) {
+      const text = ownLabel(container);
+      if (text.startsWith(label) && text.length > label.length && text.length < 240) {
+        return normalize(text.slice(label.length))
+          .replace(/\b(?:Details|Edit)\b\s*$/i, "")
+          .trim();
+      }
+      container = container.parentElement;
+    }
+
+    return "";
+  }
+
+  function findNearbyAction(label, actionLabel) {
+    const element = findTextElement(label);
+    if (!element) return null;
+
+    let container = element.parentElement;
+    for (let depth = 0; depth < 7 && container; depth += 1) {
+      const action = [...container.querySelectorAll("a, button, input[type='button'], input[type='submit']")]
+        .find((candidate) => ownLabel(candidate) === actionLabel);
+      if (action) return action;
+      container = container.parentElement;
+    }
+
+    return null;
+  }
+
+  function parseFinancialSummary() {
+    return globalThis.SCU.homepage.parseFinancialSummary(sourceText());
   }
 
   function invokeOriginal(element) {
@@ -61,6 +136,43 @@
     button.textContent = label;
     const original = findAction(options.originalLabel ?? label, options.mode);
     button.disabled = !original;
+    button.addEventListener("click", () => invokeOriginal(original));
+    return button;
+  }
+
+  function createSectionButton(label, targetId, iconName) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "scu-nav-button";
+    button.prepend(createIcon(iconName));
+    button.append(label);
+    button.addEventListener("click", () => {
+      const root = document.getElementById(ROOT_ID);
+      const target = targetId === ROOT_ID ? root : root?.querySelector(`#${targetId}`);
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return button;
+  }
+
+  function createLinkRow(label, description = "", iconName = "arrow") {
+    const original = findAction(label);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "scu-link-row";
+    button.disabled = !original;
+
+    const copy = document.createElement("span");
+    const title = document.createElement("strong");
+    title.textContent = label;
+    copy.append(title);
+
+    if (description) {
+      const detail = document.createElement("small");
+      detail.textContent = description;
+      copy.append(detail);
+    }
+
+    button.append(copy, createIcon(iconName));
     button.addEventListener("click", () => invokeOriginal(original));
     return button;
   }
@@ -125,10 +237,24 @@
     brand.innerHTML = '<span class="scu-brand-mark" aria-hidden="true">C</span><span>Student Center</span>';
     container.append(brand);
 
-    const label = document.createElement("p");
-    label.className = "scu-nav-label";
-    label.textContent = "Academics";
-    container.append(label);
+    const homeLabel = document.createElement("p");
+    homeLabel.className = "scu-nav-label";
+    homeLabel.textContent = "Home";
+    container.append(homeLabel);
+
+    [
+      ["Overview", ROOT_ID, "overview"],
+      ["Schedule", "scu-schedule", "plan"],
+      ["Finances", "scu-finances", "finance"],
+      ["Profile", "scu-profile", "profile"]
+    ].forEach(([label, target, icon]) => {
+      container.append(createSectionButton(label, target, icon));
+    });
+
+    const actionsLabel = document.createElement("p");
+    actionsLabel.className = "scu-nav-label scu-nav-label--spaced";
+    actionsLabel.textContent = "Academics";
+    container.append(actionsLabel);
 
     ACTION_LABELS.forEach((action, index) => {
       const button = createActionButton(action);
@@ -168,6 +294,7 @@
 
   function renderCalendar(container, schedule) {
     const card = document.createElement("section");
+    card.id = "scu-schedule";
     card.className = "scu-card scu-schedule-card";
     card.setAttribute("aria-labelledby", "scu-schedule-title");
 
@@ -302,6 +429,101 @@
     container.append(card);
   }
 
+  function renderFinances(container, summary) {
+    const card = document.createElement("section");
+    card.id = "scu-finances";
+    card.className = "scu-card scu-finances-card";
+    card.innerHTML = '<div class="scu-card-heading"><div><p class="scu-eyebrow">Finances</p><h2>Account overview</h2></div></div>';
+
+    if (summary.available) {
+      const overview = document.createElement("div");
+      overview.className = "scu-financial-overview";
+      const balance = document.createElement("div");
+      balance.className = "scu-balance-block";
+      const balanceLabel = document.createElement("span");
+      balanceLabel.textContent = "Account balance";
+      const amount = document.createElement("strong");
+      amount.textContent = summary.balance;
+      balance.append(balanceLabel, amount);
+
+      if (summary.pastDue) {
+        const badge = document.createElement("span");
+        badge.className = "scu-alert-badge";
+        badge.textContent = "Past due";
+        balance.append(badge);
+      }
+
+      const metrics = document.createElement("div");
+      metrics.className = "scu-financial-metrics";
+      [["Due now", summary.dueNow], ["Future due", summary.futureDue]].forEach(([label, value]) => {
+        const metric = document.createElement("div");
+        const metricLabel = document.createElement("span");
+        metricLabel.textContent = label;
+        const metricValue = document.createElement("strong");
+        metricValue.textContent = value;
+        metric.append(metricLabel, metricValue);
+        metrics.append(metric);
+      });
+      overview.append(balance, metrics);
+      card.append(overview);
+    } else {
+      const empty = document.createElement("div");
+      empty.className = "scu-empty-compact";
+      empty.innerHTML = "<strong>No account summary shown</strong><span>Open Account Inquiry for current details.</span>";
+      card.append(empty);
+    }
+
+    const links = document.createElement("div");
+    links.className = "scu-link-grid";
+    [
+      ["Account Inquiry", "Charges, payments, and balances"],
+      ["View Financial Aid", "Awards and aid information"],
+      ["Accept/Decline Awards", "Respond to offered aid"],
+      ["View/Pay Bursar Bill", "Open Cornell’s billing service"]
+    ].forEach(([label, description]) => links.append(createLinkRow(label, description)));
+    card.append(links);
+    container.append(card);
+  }
+
+  function renderProfile(container) {
+    const card = document.createElement("section");
+    card.id = "scu-profile";
+    card.className = "scu-card scu-profile-card";
+    card.innerHTML = '<div class="scu-card-heading"><div><p class="scu-eyebrow">Personal information</p><h2>Profile and contact</h2></div></div>';
+
+    const email = extractLabeledValue("CU Assigned E-mail");
+    if (email) {
+      const summary = document.createElement("div");
+      summary.className = "scu-profile-summary";
+      summary.append(createIcon("mail"));
+      const copy = document.createElement("span");
+      const label = document.createElement("small");
+      label.textContent = "Cornell-assigned email";
+      const value = document.createElement("strong");
+      value.textContent = email;
+      copy.append(label, value);
+      summary.append(copy);
+      card.append(summary);
+    }
+
+    const note = document.createElement("p");
+    note.className = "scu-privacy-note";
+    note.textContent = "Home and campus addresses stay hidden on this overview for privacy.";
+    card.append(note);
+
+    const links = document.createElement("div");
+    links.className = "scu-link-grid scu-link-grid--profile";
+    [
+      ["Demographic Data", "Review personal details"],
+      ["Emergency Contact", "Manage emergency contacts"],
+      ["Emergency Mass Notification", "Update CornellALERT information"],
+      ["Names", "Review name preferences"],
+      ["User Preferences", "Student Center preferences"]
+    ].forEach(([label, description]) => links.append(createLinkRow(label, description)));
+    card.append(links);
+    container.append(card);
+  }
+
   function renderStatus(container) {
     const card = document.createElement("section");
     card.className = "scu-card scu-status-card";
@@ -383,6 +605,58 @@
     container.append(card);
   }
 
+  function renderAdvisor(container) {
+    const card = document.createElement("section");
+    card.className = "scu-card scu-advisor-card";
+    card.innerHTML = '<div class="scu-card-heading"><div><p class="scu-eyebrow">Support</p><h2>Advisor</h2></div></div>';
+
+    const advisor = extractLabeledValue("Program Advisor");
+    const body = document.createElement("div");
+    body.className = "scu-advisor-body";
+    const avatar = document.createElement("span");
+    avatar.className = "scu-advisor-avatar";
+    avatar.textContent = advisor ? advisor.charAt(0).toUpperCase() : "A";
+    avatar.setAttribute("aria-hidden", "true");
+    const copy = document.createElement("span");
+    const title = document.createElement("strong");
+    title.textContent = advisor || "Program advisor";
+    const detail = document.createElement("small");
+    detail.textContent = advisor ? "Your assigned advising contact" : "View your advising information";
+    copy.append(title, detail);
+    body.append(avatar, copy);
+
+    const original = findNearbyAction("Program Advisor", "Details");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "scu-secondary-button";
+    button.textContent = "View details";
+    button.disabled = !original;
+    button.addEventListener("click", () => invokeOriginal(original));
+    body.append(button);
+    card.append(body);
+    container.append(card);
+  }
+
+  function renderResources(container) {
+    const card = document.createElement("section");
+    card.className = "scu-card scu-resources-card";
+    card.innerHTML = '<div class="scu-card-heading"><div><p class="scu-eyebrow">Cornell links</p><h2>Resources</h2></div></div>';
+    const list = document.createElement("div");
+    list.className = "scu-resource-list";
+
+    [
+      ["Class Roster", "Browse current course offerings"],
+      ["University Catalog", "Programs, policies, and courses"],
+      ["Guide to Enrollment", "Registration guidance"],
+      ["University Bursar Office", "Billing help and information"],
+      ["View CornellCard Activity", "Review CornellCard transactions"],
+      ["Enrollment Shopping Cart", "Review planned classes"]
+    ].forEach(([label, description]) => list.append(createLinkRow(label, description)));
+
+    card.append(list);
+    container.append(card);
+  }
+
   function showOriginalView() {
     const root = document.getElementById(ROOT_ID);
     if (root) root.hidden = true;
@@ -405,6 +679,7 @@
 
   function render(root, rows) {
     const schedule = globalThis.SCU.schedule.buildSchedule(rows);
+    const financialSummary = parseFinancialSummary();
     root.replaceChildren();
     root.removeAttribute("aria-hidden");
     root.className = "scu-dashboard-root";
@@ -429,12 +704,16 @@
     primary.className = "scu-primary-column";
     renderCalendar(primary, schedule);
     renderQuickActions(primary);
+    renderFinances(primary, financialSummary);
+    renderProfile(primary);
 
     const secondary = document.createElement("aside");
     secondary.className = "scu-secondary-column";
     secondary.setAttribute("aria-label", "Student status and tasks");
     renderStatus(secondary);
     renderTodo(secondary);
+    renderAdvisor(secondary);
+    renderResources(secondary);
 
     content.append(primary, secondary);
     page.append(header, content);
@@ -466,7 +745,10 @@
       document.documentElement.classList.remove("scu-dashboard-mounted");
       return false;
     }
-    const signature = JSON.stringify(rows);
+    const signature = JSON.stringify({
+      rows,
+      actionCount: interactiveElements().length
+    });
     if (signature === lastSignature && root.childElementCount) return true;
 
     lastSignature = signature;
