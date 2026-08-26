@@ -12,6 +12,8 @@ This initial scaffold has no dependencies or build step.
 4. Select this project directory.
 5. Open Cornell Student Center and sign in normally.
 
+Student Center renders its application inside a PeopleSoft target frame. The extension injects into matching subframes so it can enhance the actual page rather than only the surrounding portal shell.
+
 After changing a file, select **Reload** on the extension card and refresh Student Center.
 
 Run the dependency-free parser test with:
