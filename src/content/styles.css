@@ -62,13 +62,22 @@
   position: fixed;
   z-index: 2147483000;
   inset: 0;
+  height: 100vh;
+  height: 100dvh;
   overflow: auto;
+  overscroll-behavior: none;
   color: var(--scu-ink);
   background: var(--scu-canvas);
   font-family: var(--scu-font);
   font-size: 14px;
   line-height: 1.45;
   text-align: left;
+}
+
+:root.scu-dashboard-mounted,
+:root.scu-dashboard-mounted body {
+  overflow: hidden !important;
+  overscroll-behavior: none;
 }
 
 #scu-extension-root *,

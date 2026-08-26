@@ -386,6 +386,7 @@
   function showOriginalView() {
     const root = document.getElementById(ROOT_ID);
     if (root) root.hidden = true;
+    document.documentElement.classList.remove("scu-dashboard-mounted");
 
     let returnButton = document.getElementById(RETURN_ID);
     if (!returnButton) {
@@ -395,6 +396,7 @@
       returnButton.textContent = "Return to modern view";
       returnButton.addEventListener("click", () => {
         root.hidden = false;
+        document.documentElement.classList.add("scu-dashboard-mounted");
         returnButton.remove();
       });
       document.body.append(returnButton);
@@ -406,6 +408,7 @@
     root.replaceChildren();
     root.removeAttribute("aria-hidden");
     root.className = "scu-dashboard-root";
+    document.documentElement.classList.add("scu-dashboard-mounted");
 
     const app = document.createElement("div");
     app.className = "scu-dashboard";
@@ -450,6 +453,7 @@
         root.className = "";
         root.setAttribute("aria-hidden", "true");
       }
+      document.documentElement.classList.remove("scu-dashboard-mounted");
       lastSignature = "";
       return false;
     }
@@ -459,6 +463,7 @@
       root.replaceChildren();
       root.className = "";
       root.setAttribute("aria-hidden", "true");
+      document.documentElement.classList.remove("scu-dashboard-mounted");
       return false;
     }
     const signature = JSON.stringify(rows);
@@ -471,6 +476,7 @@
 
   function unmount() {
     document.getElementById(RETURN_ID)?.remove();
+    document.documentElement.classList.remove("scu-dashboard-mounted");
     lastSignature = "";
   }
 

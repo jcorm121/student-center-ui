@@ -1,4 +1,8 @@
 (() => {
+  // The top portal can inspect its same-origin PeopleSoft target frame. Keeping
+  // one renderer prevents duplicate dashboards from stacking during overscroll.
+  if (window !== window.top) return;
+
   const ROOT_CLASS = "scu-extension-enabled";
   const MOUNT_ID = "scu-extension-root";
   const DEFAULT_SETTINGS = Object.freeze({
