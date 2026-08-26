@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Cornell Student Center UI",
+  "description": "A cleaner, more usable interface for Cornell Student Center.",
+  "version": "0.1.0",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://studentcenter.cornell.edu/*",
+    "https://www.studentcenter.cornell.edu/*",
+    "https://corcsprd.peoplesoft.cornell.edu/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Cornell Student Center UI",
+    "default_popup": "src/popup/index.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://studentcenter.cornell.edu/*",
+        "https://www.studentcenter.cornell.edu/*",
+        "https://corcsprd.peoplesoft.cornell.edu/*"
+      ],
+      "css": ["src/content/styles.css"],
+      "js": [
+        "src/content/schedule.js",
+        "src/content/dashboard.js",
+        "src/content/index.js"
+      ],
+      "run_at": "document_start"
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cornell Student Center UI</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="index.js" defer></script>
+  </head>
+  <body>
+    <main class="popup">
+      <header class="popup__header">
+        <div class="mark" aria-hidden="true">CU</div>
+        <div>
+          <h1>Student Center UI</h1>
+          <p>A calmer Cornell Student Center.</p>
+        </div>
+      </header>
+
+      <label class="setting setting--toggle">
+        <span>
+          <strong>Interface upgrade</strong>
+          <small>Apply enhancements on Student Center.</small>
+        </span>
+        <input id="enabled" type="checkbox" role="switch" />
+      </label>
+
+      <label class="setting setting--select">
+        <span>
+          <strong>Appearance</strong>
+          <small>Choose how the upgraded interface looks.</small>
+        </span>
+        <select id="theme">
+          <option value="system">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+    </main>
+  </body>
+</html>
+

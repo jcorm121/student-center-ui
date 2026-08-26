@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en" class="scu-extension-enabled" data-scu-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Student Center fixture</title>
+    <link rel="stylesheet" href="../src/content/styles.css" />
+    <style>
+      body { margin: 0; font: 16px Arial, sans-serif; }
+      .legacy { padding: 24px; }
+      .legacy-layout { display: grid; grid-template-columns: 220px 1fr 300px; gap: 24px; }
+      .legacy nav { display: grid; align-content: start; gap: 12px; }
+      .legacy table { width: 100%; border-collapse: collapse; }
+      .legacy th, .legacy td { padding: 8px; border: 1px solid #aaa; text-align: left; }
+      .legacy-aside { display: grid; align-content: start; gap: 18px; }
+      .legacy-aside section { padding: 16px; border: 1px solid #aaa; }
+    </style>
+  </head>
+  <body>
+    <div class="legacy">
+      <h1>Student Center</h1>
+      <h2>Sample Student's Student Center</h2>
+      <div class="legacy-layout">
+        <nav>
+          <a href="#search">Search</a>
+          <a href="#plan">Plan</a>
+          <a href="#enroll">Enroll</a>
+          <a href="#academics">My Academics</a>
+        </nav>
+        <main>
+          <a href="#deadlines">Deadlines</a>
+          <h3>This Week's Schedule</h3>
+          <table>
+            <thead>
+              <tr><th></th><th>Class</th><th>Schedule</th></tr>
+            </thead>
+            <tbody>
+              <tr><td></td><td>INFO 1234-001<br />LEC (4567)</td><td>MoWeFr 10:10AM - 11:00AM<br />North Hall 101<br />Fr 10:10AM - 11:00AM<br />South Hall 202</td></tr>
+              <tr><td></td><td>ILR 2345-001<br />LEC (8910)</td><td>MoWe 1:25PM - 2:40PM<br />West Hall 185</td></tr>
+              <tr><td></td><td>ILR 2345-201<br />DIS (1112)</td><td>Th 2:55PM - 4:10PM<br />Engineering Hall 202</td></tr>
+              <tr><td></td><td>ARCH 3456-001<br />STU (1314)</td><td>TuTh 9:05AM - 10:20AM<br />Arts Quad 120</td></tr>
+              <tr><td></td><td>ART 4567-601<br />PRJ (1516)</td><td>TBA<br />No Room</td></tr>
+            </tbody>
+          </table>
+        </main>
+        <aside class="legacy-aside">
+          <button type="button">Search for Classes</button>
+          <section><h3>Holds</h3><p>No Holds.</p></section>
+          <section><h3>To Do List</h3><a href="#task">Complete an important requirement</a><br /><a href="#more">More</a></section>
+          <section><h3>Milestones</h3><p>No Milestones</p></section>
+          <section><h3>Enrollment Dates</h3><a href="#dates">Open Enrollment Dates</a></section>
+        </aside>
+      </div>
+    </div>
+
+    <div id="scu-extension-root"></div>
+    <script src="../src/content/schedule.js"></script>
+    <script src="../src/content/dashboard.js"></script>
+    <script>globalThis.SCU.dashboard.refresh();</script>
+  </body>
+</html>
+
