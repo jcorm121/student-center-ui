@@ -4,18 +4,39 @@
   const ACTION_LABELS = ["Search", "Plan", "Enroll", "My Academics"];
   const COLORS = ["blue", "violet", "teal", "orange", "rose", "indigo"];
   let lastSignature = "";
+  let sourceDocuments = [document];
 
   const normalize = (value) => globalThis.SCU.schedule.normalize(value);
 
   function ownLabel(element) {
     if (!element) return "";
-    if (element instanceof HTMLInputElement) return normalize(element.value);
+    if (element.tagName === "INPUT") return normalize(element.value);
     return normalize(element.textContent);
   }
 
+  function collectDocuments(rootDocument = document, collected = []) {
+    if (!rootDocument?.documentElement || collected.includes(rootDocument)) return collected;
+    collected.push(rootDocument);
+
+    rootDocument.querySelectorAll("iframe, frame").forEach((frame) => {
+      try {
+        collectDocuments(frame.contentDocument, collected);
+      } catch {
+        // Cross-origin frames are independently handled by all_frames injection.
+      }
+    });
+
+    return collected;
+  }
+
   function interactiveElements() {
-    return [...document.querySelectorAll("a, button, input[type='button'], input[type='submit']")]
-      .filter((element) => !element.closest(`#${ROOT_ID}, #${RETURN_ID}`));
+    return sourceDocuments.flatMap((sourceDocument) => {
+      return [...sourceDocument.querySelectorAll("a, button, input[type='button'], input[type='submit']")];
+    }).filter((element) => !element.closest(`#${ROOT_ID}, #${RETURN_ID}`));
+  }
+
+  function sourceText() {
+    return normalize(sourceDocuments.map((sourceDocument) => sourceDocument.body?.textContent ?? "").join(" "));
   }
 
   function findAction(label, mode = "exact") {
@@ -45,11 +66,19 @@
   }
 
   function findScheduleTable() {
-    return [...document.querySelectorAll("table")].find((table) => {
-      if (table.closest(`#${ROOT_ID}`)) return false;
-      const labels = [...table.querySelectorAll("th, td")].slice(0, 8).map(ownLabel);
-      return labels.includes("Class") && labels.includes("Schedule");
-    }) ?? null;
+    const documents = collectDocuments();
+
+    for (const sourceDocument of documents) {
+      const table = [...sourceDocument.querySelectorAll("table")].find((candidate) => {
+        if (candidate.closest(`#${ROOT_ID}`)) return false;
+        const labels = [...candidate.querySelectorAll("th, td")].slice(0, 12).map(ownLabel);
+        return labels.includes("Class") && labels.includes("Schedule");
+      });
+
+      if (table) return { table, documents };
+    }
+
+    return { table: null, documents };
   }
 
   function extractRows(table) {
@@ -273,7 +302,7 @@
     card.innerHTML = '<div class="scu-card-heading"><div><p class="scu-eyebrow">Student status</p><h2>At a glance</h2></div></div>';
     const list = document.createElement("div");
     list.className = "scu-status-list";
-    const bodyText = normalize(document.body.textContent);
+    const bodyText = sourceText();
 
     const items = [
       {
@@ -328,7 +357,7 @@
     card.append(heading);
 
     const more = findAction("More");
-    const hasTodo = normalize(document.body.textContent).includes("To Do List") && more;
+    const hasTodo = sourceText().includes("To Do List") && more;
     const content = document.createElement("div");
     content.className = hasTodo ? "scu-todo-content" : "scu-empty-compact";
 
@@ -405,7 +434,9 @@
   }
 
   function refresh() {
-    const table = findScheduleTable();
+    const result = findScheduleTable();
+    const { table } = result;
+    sourceDocuments = result.documents;
     const root = document.getElementById(ROOT_ID);
     if (!table || !root) {
       if (root) {

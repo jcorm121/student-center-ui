@@ -8,6 +8,7 @@
 
   let settings = { ...DEFAULT_SETTINGS };
   let observer = null;
+  let pollTimer = null;
   let scheduled = false;
 
   function getRoute() {
@@ -31,7 +32,9 @@
 
     if (enabled) {
       ensureMountPoint();
+      startPolling();
     } else {
+      stopPolling();
       globalThis.SCU.dashboard?.unmount();
       document.getElementById(MOUNT_ID)?.remove();
     }
@@ -61,6 +64,17 @@
       childList: true,
       subtree: true
     });
+  }
+
+  function startPolling() {
+    if (pollTimer !== null) return;
+    pollTimer = window.setInterval(scheduleEnhancement, 1200);
+  }
+
+  function stopPolling() {
+    if (pollTimer === null) return;
+    window.clearInterval(pollTimer);
+    pollTimer = null;
   }
 
   async function initialize() {
