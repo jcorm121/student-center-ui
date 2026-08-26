@@ -69,11 +69,17 @@
     const documents = collectDocuments();
 
     for (const sourceDocument of documents) {
-      const table = [...sourceDocument.querySelectorAll("table")].find((candidate) => {
-        if (candidate.closest(`#${ROOT_ID}`)) return false;
-        const labels = [...candidate.querySelectorAll("th, td")].slice(0, 12).map(ownLabel);
-        return labels.includes("Class") && labels.includes("Schedule");
-      });
+      const matchingTables = [...sourceDocument.querySelectorAll("table")]
+        .filter((candidate) => {
+          if (candidate.closest(`#${ROOT_ID}`)) return false;
+          const labels = [...candidate.querySelectorAll("th, td")].map(ownLabel);
+          return labels.includes("Class") && labels.includes("Schedule");
+        })
+        .sort((first, second) => {
+          return first.querySelectorAll("th, td").length - second.querySelectorAll("th, td").length;
+        });
+
+      const table = matchingTables[0];
 
       if (table) return { table, documents };
     }
