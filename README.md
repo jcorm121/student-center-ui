@@ -37,3 +37,7 @@ Open `test/fixture.html` to preview the dashboard with synthetic data. The fixtu
 - Keep selectors scoped beneath `.scu-extension-enabled`.
 - Preserve keyboard navigation and accessible names.
 - Treat Student Center data as private; do not transmit it off-device.
+
+## License
+
+[MIT](LICENSE)

@@ -58,6 +58,7 @@
 }
 
 #scu-extension-root.scu-dashboard-root {
+  display: block;
   position: fixed;
   z-index: 2147483000;
   inset: 0;
