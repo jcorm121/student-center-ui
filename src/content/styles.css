@@ -213,6 +213,11 @@
   padding: 24px clamp(24px, 4vw, 56px) 48px;
 }
 
+.scu-content--enrollment {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 1240px;
+}
+
 .scu-primary-column,
 .scu-secondary-column {
   display: grid;
@@ -251,6 +256,202 @@
   font-size: 17px;
   font-weight: 680;
   letter-spacing: -0.02em;
+}
+
+.scu-calendar-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.scu-add-class-button,
+.scu-primary-button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 13px;
+  border: 1px solid var(--scu-carnelian-dark);
+  border-radius: var(--scu-radius-sm);
+  color: #fff;
+  background: var(--scu-carnelian);
+  box-shadow: var(--scu-shadow-sm);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 680;
+}
+
+.scu-add-class-button:hover,
+.scu-primary-button:hover:not(:disabled) {
+  background: var(--scu-carnelian-dark);
+}
+
+.scu-primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.scu-class-search-panel {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--scu-border);
+  background: color-mix(in srgb, var(--scu-blue) 3%, var(--scu-surface));
+}
+
+.scu-class-search-panel[hidden] {
+  display: none;
+}
+
+.scu-search-intro {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 12px;
+}
+
+.scu-search-intro > div {
+  display: grid;
+  gap: 2px;
+}
+
+.scu-search-intro strong {
+  color: var(--scu-ink);
+  font-size: 14px;
+}
+
+.scu-search-intro span,
+.scu-search-note {
+  color: var(--scu-muted);
+  font-size: 11px;
+}
+
+.scu-search-dismiss {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: var(--scu-muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.scu-search-dismiss:hover {
+  color: var(--scu-ink);
+  background: var(--scu-canvas);
+}
+
+.scu-quick-search {
+  display: grid;
+  grid-template-columns: 18px minmax(180px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 7px 7px 13px;
+  border: 1px solid var(--scu-border-strong);
+  border-radius: 10px;
+  background: var(--scu-surface);
+  box-shadow: var(--scu-shadow-sm);
+}
+
+.scu-quick-search > input {
+  min-width: 0;
+  padding: 6px 0;
+  border: 0;
+  outline: 0;
+  color: var(--scu-ink);
+  background: transparent;
+  font: inherit;
+}
+
+.scu-search-fields {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.3fr) minmax(150px, 0.8fr) minmax(110px, 0.6fr) minmax(170px, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--scu-border);
+}
+
+.scu-search-field {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.scu-search-field > span,
+.scu-checkbox-field {
+  color: var(--scu-muted);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.scu-search-field input,
+.scu-search-field select {
+  width: 100%;
+  min-height: 38px;
+  padding: 7px 9px;
+  border: 1px solid var(--scu-border-strong);
+  border-radius: 7px;
+  color: var(--scu-ink);
+  background: var(--scu-surface);
+  font: inherit;
+}
+
+.scu-checkbox-field {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 8px;
+}
+
+.scu-checkbox-field input {
+  accent-color: var(--scu-carnelian);
+}
+
+.scu-search-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.scu-search-actions .scu-secondary-button {
+  width: auto;
+  min-width: 90px;
+}
+
+.scu-more-filters-button {
+  margin-right: auto;
+}
+
+.scu-search-note {
+  margin: 10px 0 0;
+}
+
+.scu-results-notice-body {
+  display: grid;
+  justify-items: start;
+  gap: 7px;
+  padding: 20px;
+}
+
+.scu-results-notice-body strong {
+  color: var(--scu-ink);
+  font-size: 14px;
+}
+
+.scu-results-notice-body span {
+  max-width: 660px;
+  color: var(--scu-muted);
+  font-size: 11px;
+}
+
+.scu-results-notice-body .scu-primary-button {
+  margin-top: 6px;
 }
 
 .scu-count-pill {
@@ -836,6 +1037,19 @@
   inset: 10px auto auto 10px;
 }
 
+.scu-icon--plus::before,
+.scu-icon--plus::after {
+  width: 10px;
+  height: 1.7px;
+  border-radius: 2px;
+  background: currentColor;
+  inset: 7px auto auto 3px;
+}
+
+.scu-icon--plus::after {
+  transform: rotate(90deg);
+}
+
 .scu-icon--plan::before,
 .scu-icon--academics::before,
 .scu-icon--enroll::before,
@@ -956,6 +1170,10 @@
   .scu-balance-block {
     border-right: 0;
     border-bottom: 1px solid var(--scu-border);
+  }
+
+  .scu-search-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

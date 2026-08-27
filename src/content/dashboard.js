@@ -1,6 +1,8 @@
 (() => {
   const ROOT_ID = "scu-extension-root";
   const RETURN_ID = "scu-return-modern";
+  const SCHEDULE_CACHE_KEY = "scu-schedule-cache-v1";
+  const SEARCH_CACHE_KEY = "scu-pending-class-search-v1";
   const ACTION_LABELS = ["Search", "Plan", "Enroll", "My Academics"];
   const COLORS = ["blue", "violet", "teal", "orange", "rose", "indigo"];
   let lastSignature = "";
@@ -52,6 +54,49 @@
       const candidate = ownLabel(element).toLowerCase();
       return mode === "contains" ? candidate.includes(target) : candidate === target;
     }) ?? null;
+  }
+
+  function findButtonAction(label) {
+    const target = normalize(label).toLowerCase();
+    return interactiveElements().filter((element) => {
+      if (element.tagName === "A") return false;
+      return ownLabel(element).toLowerCase() === target;
+    }).at(-1) ?? null;
+  }
+
+  function pageKind() {
+    const text = sourceText();
+    if (!/Enrollment:\s*Add Classes/i.test(text)) return "home";
+    if (/Search Results/i.test(text)) return "class-results";
+    if (/Enter Search Criteria|Search for Classes/i.test(text) && /Course Number/i.test(text)) {
+      return "class-search";
+    }
+    return "add-classes";
+  }
+
+  function readSessionValue(key, fallback) {
+    try {
+      const value = window.sessionStorage.getItem(key);
+      return value ? JSON.parse(value) : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  function writeSessionValue(key, value) {
+    try {
+      window.sessionStorage.setItem(key, JSON.stringify(value));
+    } catch {
+      // The workflow still works without continuity if storage is unavailable.
+    }
+  }
+
+  function removeSessionValue(key) {
+    try {
+      window.sessionStorage.removeItem(key);
+    } catch {
+      // Ignore unavailable storage.
+    }
   }
 
   function findTextElement(label) {
@@ -116,6 +161,87 @@
     }
 
     return null;
+  }
+
+  function nearbyControls(label, selector) {
+    const element = findTextElement(label);
+    if (!element) return [];
+
+    const sourceDocument = element.ownerDocument;
+    const htmlLabel = element.closest("label");
+    const labelledControl = htmlLabel?.htmlFor ? sourceDocument.getElementById(htmlLabel.htmlFor) : null;
+    if (labelledControl?.matches(selector)) return [labelledControl];
+
+    let container = element.parentElement;
+    for (let depth = 0; depth < 7 && container; depth += 1) {
+      const matches = [...container.querySelectorAll(selector)]
+        .filter((candidate) => !candidate.closest(`#${ROOT_ID}`));
+      if (matches.length) return matches;
+      container = container.parentElement;
+    }
+    return [];
+  }
+
+  function dispatchControlChange(control) {
+    const EventConstructor = control.ownerDocument.defaultView.Event;
+    control.dispatchEvent(new EventConstructor("input", { bubbles: true }));
+    control.dispatchEvent(new EventConstructor("change", { bubbles: true }));
+  }
+
+  function setControlValue(control, value) {
+    if (!control) return;
+    control.value = value;
+    dispatchControlChange(control);
+  }
+
+  function findSearchControls() {
+    const subject = nearbyControls("Subject", "select")[0] ?? null;
+    const directCourseControls = nearbyControls(
+      "Course Number",
+      "select, input:not([type='button']):not([type='submit']):not([type='image']):not([type='checkbox']):not([type='radio'])"
+    );
+    let courseControls = directCourseControls;
+    if (!courseControls.some((control) => control.tagName === "INPUT")) {
+      const label = findTextElement("Course Number");
+      let container = label?.parentElement;
+      for (let depth = 0; depth < 6 && container; depth += 1) {
+        const matches = [...container.querySelectorAll(
+          "select, input:not([type='button']):not([type='submit']):not([type='image']):not([type='checkbox']):not([type='radio'])"
+        )].filter((candidate) => !candidate.closest(`#${ROOT_ID}`));
+        if (
+          matches.some((control) => control.tagName === "SELECT") &&
+          matches.some((control) => control.tagName === "INPUT")
+        ) {
+          courseControls = matches;
+          break;
+        }
+        container = container.parentElement;
+      }
+    }
+    const courseOperator = directCourseControls.find((control) => control.tagName === "SELECT") ??
+      courseControls.find((control) => control.tagName === "SELECT") ?? null;
+    const courseNumber = courseControls.find((control) => control.tagName === "INPUT") ?? null;
+    const career = nearbyControls("Course Career", "select")[0] ?? null;
+    const openOnly = nearbyControls("Show Open Classes Only", "input[type='checkbox']")[0] ?? null;
+
+    return { subject, courseOperator, courseNumber, career, openOnly };
+  }
+
+  function findAddSearchAction() {
+    const local = findNearbyAction("Find Classes", "Search");
+    if (local && local.tagName !== "A") return local;
+    return findButtonAction("Search");
+  }
+
+  function findClassNumberControls() {
+    const controls = nearbyControls(
+      "Enter Class Nbr",
+      "input:not([type='button']):not([type='submit']):not([type='image'])"
+    );
+    return {
+      input: controls[0] ?? null,
+      submit: findNearbyAction("Enter Class Nbr", "Enter")
+    };
   }
 
   function extractAdvisorNames() {
@@ -333,6 +459,25 @@
       if (table) return { table, documents };
     }
 
+    const fallbackTables = documents.flatMap((sourceDocument) => {
+      return [...sourceDocument.querySelectorAll("table")]
+        .filter((candidate) => !candidate.closest(`#${ROOT_ID}`))
+        .map((table) => {
+          const matchingRows = [...table.rows].filter((row) => {
+            const text = ownLabel(row);
+            return /\b[A-Z&]{2,8}\s*\d{3,4}(?:-\d{3})?\b/.test(text) &&
+              (/\d{1,2}:\d{2}\s*(?:AM|PM)/i.test(text) || /\bTBA\b/i.test(text));
+          });
+          return { table, matchCount: matchingRows.length };
+        })
+        .filter((candidate) => candidate.matchCount);
+    }).sort((first, second) => {
+      return second.matchCount - first.matchCount ||
+        first.table.querySelectorAll("th, td").length - second.table.querySelectorAll("th, td").length;
+    });
+
+    if (fallbackTables[0]) return { table: fallbackTables[0].table, documents };
+
     return { table: null, documents };
   }
 
@@ -342,18 +487,44 @@
       const labels = [...row.cells].map(ownLabel);
       return labels.includes("Class") && labels.includes("Schedule");
     });
-    if (!header) return [];
+    if (!header) {
+      return rows.map((row) => {
+        const cells = [...row.cells];
+        const courseCell = cells.find((cell) => /\b[A-Z&]{2,8}\s*\d{3,4}(?:-\d{3})?\b/.test(ownLabel(cell)));
+        const rowText = ownLabel(row);
+        return {
+          courseText: ownLabel(courseCell),
+          scheduleText: rowText,
+          statusText: cells.map(ownLabel).join(" ")
+        };
+      }).filter((row) => {
+        return row.courseText &&
+          (/\d{1,2}:\d{2}\s*(?:AM|PM)/i.test(row.scheduleText) || /\bTBA\b/i.test(row.scheduleText)) &&
+          !/\bDropped\b/i.test(row.statusText);
+      });
+    }
 
     const labels = [...header.cells].map(ownLabel);
     const classIndex = labels.indexOf("Class");
     const scheduleIndex = labels.indexOf("Schedule");
+    const statusIndex = labels.findIndex((label) => /Status/i.test(label));
 
     return rows.slice(rows.indexOf(header) + 1)
       .map((row) => ({
         courseText: ownLabel(row.cells[classIndex]),
-        scheduleText: ownLabel(row.cells[scheduleIndex])
+        scheduleText: ownLabel(row.cells[scheduleIndex]),
+        statusText: statusIndex >= 0 ? ownLabel(row.cells[statusIndex]) : ownLabel(row)
       }))
-      .filter((row) => row.courseText && row.scheduleText);
+      .filter((row) => row.courseText && row.scheduleText && !/\bDropped\b/i.test(row.statusText));
+  }
+
+  function cacheScheduleRows(rows) {
+    if (rows.length) writeSessionValue(SCHEDULE_CACHE_KEY, rows);
+  }
+
+  function cachedScheduleRows() {
+    const rows = readSessionValue(SCHEDULE_CACHE_KEY, []);
+    return Array.isArray(rows) ? rows : [];
   }
 
   function colorFor(value) {
@@ -368,11 +539,38 @@
     return icon;
   }
 
-  function renderNavigation(container) {
+  function renderNavigation(container, kind = "home") {
     const brand = document.createElement("div");
     brand.className = "scu-brand";
     brand.innerHTML = '<span class="scu-brand-mark" aria-hidden="true">C</span><span>Student Center</span>';
     container.append(brand);
+
+    if (kind !== "home") {
+      const enrollmentLabel = document.createElement("p");
+      enrollmentLabel.className = "scu-nav-label";
+      enrollmentLabel.textContent = "Enrollment";
+      container.append(enrollmentLabel);
+
+      const scheduleButton = createSectionButton("Schedule and search", "scu-schedule", "plan");
+      container.append(scheduleButton);
+      ["My Class Schedule", "Add", "Drop", "Swap", "Edit", "Term Information"].forEach((label) => {
+        const button = createActionButton(label);
+        button.prepend(createIcon(label === "Add" ? "plus" : "arrow"));
+        container.append(button);
+      });
+
+      const spacer = document.createElement("div");
+      spacer.className = "scu-nav-spacer";
+      container.append(spacer);
+      const originalButton = document.createElement("button");
+      originalButton.type = "button";
+      originalButton.className = "scu-nav-button scu-original-button";
+      originalButton.prepend(createIcon("legacy"));
+      originalButton.append("Original view");
+      originalButton.addEventListener("click", showOriginalView);
+      container.append(originalButton);
+      return;
+    }
 
     const homeLabel = document.createElement("p");
     homeLabel.className = "scu-nav-label";
@@ -413,7 +611,243 @@
     container.append(originalButton);
   }
 
-  function renderCalendar(container, schedule) {
+  function pendingSearch() {
+    const pending = readSessionValue(SEARCH_CACHE_KEY, null);
+    return pending && typeof pending.query === "string" ? pending : null;
+  }
+
+  function savePendingSearch(query, changes = {}) {
+    const current = pendingSearch() ?? {};
+    const next = { ...current, query, ...changes };
+    writeSessionValue(SEARCH_CACHE_KEY, next);
+    return next;
+  }
+
+  function selectOptionForSubject(select, subject) {
+    if (!select || !subject) return false;
+    const option = [...select.options]
+      .find((candidate) => globalThis.SCU.enrollment.optionMatchesSubject(candidate, subject));
+    if (!option) return false;
+    select.selectedIndex = option.index;
+    dispatchControlChange(select);
+    return true;
+  }
+
+  function applyClassQueryToOriginal(queryValue) {
+    const query = globalThis.SCU.enrollment.parseClassQuery(queryValue);
+    const controls = findSearchControls();
+    const result = { query, subjectMatched: false, courseMatched: false };
+
+    if (query.subject && controls.subject) {
+      result.subjectMatched = selectOptionForSubject(controls.subject, query.subject);
+    }
+    if (query.courseNumber && controls.courseNumber) {
+      setControlValue(controls.courseNumber, query.courseNumber);
+      result.courseMatched = true;
+    }
+    return result;
+  }
+
+  function beginEnrollmentSearch(queryValue) {
+    const query = globalThis.SCU.enrollment.parseClassQuery(queryValue);
+    if (!query.raw) return;
+    savePendingSearch(query.raw, { advanced: false, submitted: false });
+    const kind = pageKind();
+
+    if (kind === "home") {
+      const menu = findSelectMenu("Other Academic Information");
+      const addItem = menu?.items.find((item) => /^Enrollment:\s*Add$/i.test(item.label));
+      if (menu && addItem) {
+        invokeSelectItem(menu, addItem);
+        return;
+      }
+      invokeOriginal(findAction("Search for Classes"));
+      return;
+    }
+
+    if (kind === "add-classes") {
+      if (query.classNumber) {
+        const controls = findClassNumberControls();
+        setControlValue(controls.input, query.classNumber);
+        controls.submit?.click();
+      } else {
+        findAddSearchAction()?.click();
+      }
+      return;
+    }
+
+    if (kind === "class-search") {
+      applyClassQueryToOriginal(query.raw);
+      findButtonAction("Search")?.click();
+    }
+  }
+
+  function createMirroredSelect(original, labelText) {
+    if (!original) return null;
+    const field = document.createElement("label");
+    field.className = "scu-search-field";
+    const label = document.createElement("span");
+    label.textContent = labelText;
+    const select = document.createElement("select");
+    [...original.options].forEach((originalOption) => {
+      const option = document.createElement("option");
+      option.value = originalOption.value;
+      option.textContent = normalize(originalOption.textContent);
+      option.selected = originalOption.selected;
+      select.append(option);
+    });
+    select.addEventListener("change", () => setControlValue(original, select.value));
+    field.append(label, select);
+    return field;
+  }
+
+  function createMirroredInput(original, labelText, placeholder = "") {
+    if (!original) return null;
+    const field = document.createElement("label");
+    field.className = "scu-search-field";
+    const label = document.createElement("span");
+    label.textContent = labelText;
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = original.value ?? "";
+    input.placeholder = placeholder;
+    input.addEventListener("input", () => setControlValue(original, input.value));
+    field.append(label, input);
+    return field;
+  }
+
+  function renderFullSearchForm(container) {
+    const controls = findSearchControls();
+    if (!controls.subject && !controls.courseNumber) return;
+
+    const form = document.createElement("div");
+    form.className = "scu-search-fields";
+    const subject = createMirroredSelect(controls.subject, "Subject");
+    const course = createMirroredInput(controls.courseNumber, "Course number", "4820");
+    const career = createMirroredSelect(controls.career, "Course career");
+    [subject, course, career].filter(Boolean).forEach((field) => form.append(field));
+
+    if (controls.courseOperator) {
+      const operator = createMirroredSelect(controls.courseOperator, "Course number match");
+      if (operator) {
+        operator.classList.add("scu-search-field--operator");
+        form.insertBefore(operator, course);
+      }
+    }
+
+    if (controls.openOnly) {
+      const field = document.createElement("label");
+      field.className = "scu-checkbox-field";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = controls.openOnly.checked;
+      checkbox.addEventListener("change", () => {
+        controls.openOnly.checked = checkbox.checked;
+        dispatchControlChange(controls.openOnly);
+      });
+      field.append(checkbox, "Show open classes only");
+      form.append(field);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "scu-search-actions";
+    const clear = document.createElement("button");
+    clear.type = "button";
+    clear.className = "scu-secondary-button";
+    clear.textContent = "Clear";
+    clear.disabled = !findButtonAction("Clear");
+    clear.addEventListener("click", () => {
+      removeSessionValue(SEARCH_CACHE_KEY);
+      findButtonAction("Clear")?.click();
+    });
+    const search = document.createElement("button");
+    search.type = "button";
+    search.className = "scu-primary-button";
+    search.textContent = "Search classes";
+    search.disabled = !findButtonAction("Search");
+    search.addEventListener("click", () => {
+      removeSessionValue(SEARCH_CACHE_KEY);
+      findButtonAction("Search")?.click();
+    });
+    actions.append(clear, search);
+
+    const more = findAction("Additional Search Criteria", "contains");
+    if (more) {
+      const moreButton = document.createElement("button");
+      moreButton.type = "button";
+      moreButton.className = "scu-text-button scu-more-filters-button";
+      moreButton.textContent = "More filters in original view";
+      moreButton.addEventListener("click", () => {
+        invokeOriginal(more);
+        showOriginalView();
+      });
+      actions.prepend(moreButton);
+    }
+
+    container.append(form, actions);
+  }
+
+  function createSearchPanel(kind) {
+    const panel = document.createElement("section");
+    panel.className = "scu-class-search-panel";
+    panel.hidden = kind === "home";
+
+    const intro = document.createElement("div");
+    intro.className = "scu-search-intro";
+    intro.innerHTML = '<div><strong>Find a class</strong><span>Search by subject and course, or enter a five-digit class number.</span></div>';
+    const dismiss = document.createElement("button");
+    dismiss.type = "button";
+    dismiss.className = "scu-search-dismiss";
+    dismiss.setAttribute("aria-label", "Close class search");
+    dismiss.textContent = "×";
+    dismiss.addEventListener("click", () => { panel.hidden = true; });
+    intro.append(dismiss);
+
+    const quickForm = document.createElement("form");
+    quickForm.className = "scu-quick-search";
+    const input = document.createElement("input");
+    input.type = "search";
+    input.autocomplete = "off";
+    input.placeholder = "Try CS 4820 or class #17325";
+    input.setAttribute("aria-label", "Class search");
+    input.value = pendingSearch()?.query ?? "";
+    const submit = document.createElement("button");
+    submit.type = "submit";
+    submit.className = "scu-primary-button";
+    submit.textContent = kind === "class-search" ? "Apply search" : "Continue";
+    quickForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      beginEnrollmentSearch(input.value);
+    });
+    quickForm.append(createIcon("search"), input, submit);
+
+    panel.append(intro, quickForm);
+    if (kind === "class-search") renderFullSearchForm(panel);
+
+    const note = document.createElement("p");
+    note.className = "scu-search-note";
+    note.textContent = "Searches and enrollment actions are completed by Cornell’s signed-in PeopleSoft session.";
+    panel.append(note);
+    return panel;
+  }
+
+  function renderSearchResultsNotice(container) {
+    const card = document.createElement("section");
+    card.className = "scu-card scu-results-notice";
+    const body = document.createElement("div");
+    body.className = "scu-results-notice-body";
+    body.innerHTML = "<strong>Your Cornell search results are ready</strong><span>The next version will bring result selection and schedule previews into this panel. For now, continue in the original results list.</span>";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "scu-primary-button";
+    button.textContent = "View search results";
+    button.addEventListener("click", showOriginalView);
+    body.append(button);
+    card.append(body);
+    container.append(card);
+  }
+
+  function renderCalendar(container, schedule, kind) {
     const card = document.createElement("section");
     card.id = "scu-schedule";
     card.className = "scu-card scu-schedule-card";
@@ -422,11 +856,23 @@
     const heading = document.createElement("div");
     heading.className = "scu-card-heading";
     heading.innerHTML = '<div><p class="scu-eyebrow">Schedule</p><h2 id="scu-schedule-title">This week</h2></div>';
+    const actions = document.createElement("div");
+    actions.className = "scu-calendar-heading-actions";
     const count = document.createElement("span");
     count.className = "scu-count-pill";
     count.textContent = `${schedule.courses.length} ${schedule.courses.length === 1 ? "course" : "courses"}`;
-    heading.append(count);
-    card.append(heading);
+    const addButton = document.createElement("button");
+    addButton.type = "button";
+    addButton.className = "scu-add-class-button";
+    addButton.append(createIcon("plus"), "Add classes");
+    actions.append(count, addButton);
+    heading.append(actions);
+    const searchPanel = createSearchPanel(kind);
+    addButton.addEventListener("click", () => {
+      searchPanel.hidden = !searchPanel.hidden;
+      if (!searchPanel.hidden) searchPanel.querySelector("input[type='search']")?.focus();
+    });
+    card.append(heading, searchPanel);
 
     if (!schedule.meetings.length) {
       const empty = document.createElement("div");
@@ -803,7 +1249,7 @@
     }
   }
 
-  function render(root, rows) {
+  function render(root, rows, kind) {
     const schedule = globalThis.SCU.schedule.buildSchedule(rows);
     const financialSummary = parseFinancialSummary();
     root.replaceChildren();
@@ -816,31 +1262,63 @@
     const nav = document.createElement("nav");
     nav.className = "scu-sidebar";
     nav.setAttribute("aria-label", "Student Center navigation");
-    renderNavigation(nav);
+    renderNavigation(nav, kind);
 
     const page = document.createElement("div");
     page.className = "scu-page";
     const content = document.createElement("main");
     content.className = "scu-content";
+    if (kind !== "home") content.classList.add("scu-content--enrollment");
     const primary = document.createElement("div");
     primary.className = "scu-primary-column";
-    renderCalendar(primary, schedule);
-    renderAcademicTools(primary);
-    renderFinances(primary, financialSummary);
-    renderProfile(primary);
+    renderCalendar(primary, schedule, kind);
 
-    const secondary = document.createElement("aside");
-    secondary.className = "scu-secondary-column";
-    secondary.setAttribute("aria-label", "Student status and tasks");
-    renderStatus(secondary);
-    renderTodo(secondary);
-    renderAdvisor(secondary);
-    renderResources(secondary);
+    if (kind === "home") {
+      renderAcademicTools(primary);
+      renderFinances(primary, financialSummary);
+      renderProfile(primary);
+    } else if (kind === "class-results") {
+      renderSearchResultsNotice(primary);
+    }
 
-    content.append(primary, secondary);
+    content.append(primary);
+    if (kind === "home") {
+      const secondary = document.createElement("aside");
+      secondary.className = "scu-secondary-column";
+      secondary.setAttribute("aria-label", "Student status and tasks");
+      renderStatus(secondary);
+      renderTodo(secondary);
+      renderAdvisor(secondary);
+      renderResources(secondary);
+      content.append(secondary);
+    }
+
     page.append(content);
     app.append(nav, page);
     root.append(app);
+  }
+
+  function continuePendingSearch(kind) {
+    const pending = pendingSearch();
+    if (!pending?.query) return;
+    const parsed = globalThis.SCU.enrollment.parseClassQuery(pending.query);
+
+    if (kind === "add-classes" && !pending.advanced && !parsed.classNumber) {
+      const action = findAddSearchAction();
+      if (!action) return;
+      savePendingSearch(pending.query, { advanced: true });
+      window.setTimeout(() => action.click(), 0);
+      return;
+    }
+
+    if (kind === "class-search" && !pending.submitted) {
+      const applied = applyClassQueryToOriginal(pending.query);
+      if (!applied.subjectMatched || !applied.courseMatched) return;
+      const action = findButtonAction("Search");
+      if (!action) return;
+      savePendingSearch(pending.query, { submitted: true });
+      window.setTimeout(() => action.click(), 0);
+    }
   }
 
   function refresh() {
@@ -848,7 +1326,16 @@
     const { table } = result;
     sourceDocuments = result.documents;
     const root = document.getElementById(ROOT_ID);
-    if (!table || !root) {
+    const kind = pageKind();
+    if (!root) return false;
+
+    let rows = table ? extractRows(table) : [];
+    if (kind === "home" || kind === "add-classes") cacheScheduleRows(rows);
+    if (kind !== "home" && (!rows.length || kind === "class-results")) {
+      rows = cachedScheduleRows();
+    }
+
+    if (kind === "home" && !rows.length) {
       if (root) {
         root.replaceChildren();
         root.className = "";
@@ -858,23 +1345,19 @@
       lastSignature = "";
       return false;
     }
-
-    const rows = extractRows(table);
-    if (!rows.length) {
-      root.replaceChildren();
-      root.className = "";
-      root.setAttribute("aria-hidden", "true");
-      document.documentElement.classList.remove("scu-dashboard-mounted");
-      return false;
-    }
     const signature = JSON.stringify({
+      kind,
       rows,
-      actionCount: interactiveElements().length
+      actionCount: interactiveElements().length,
+      searchControls: Object.values(findSearchControls()).map((control) => {
+        return control?.tagName === "SELECT" ? control.options.length : Boolean(control);
+      })
     });
     if (signature === lastSignature && root.childElementCount) return true;
 
     lastSignature = signature;
-    render(root, rows);
+    render(root, rows, kind);
+    continuePendingSearch(kind);
     return true;
   }
 

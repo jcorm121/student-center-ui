@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en" class="scu-extension-enabled" data-scu-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Add Classes fixture</title>
+    <link rel="stylesheet" href="../src/content/styles.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Enrollment: Add Classes</h1>
+      <a href="#schedule">My Class Schedule</a>
+      <a href="#add">Add</a>
+      <a href="#drop">Drop</a>
+      <a href="#swap">Swap</a>
+      <a href="#edit">Edit</a>
+      <a href="#term">Term Information</a>
+      <h2>Add Classes</h2>
+      <h3>1. Select classes to add</h3>
+      <p>Fall 2026 | Undergraduate | Cornell University</p>
+      <section>
+        <h3>Add to Cart</h3>
+        <label for="class-number">Enter Class Nbr</label>
+        <input id="class-number" />
+        <button type="button">Enter</button>
+        <h3>Find Classes</h3>
+        <label><input type="radio" checked />Class Search</label>
+        <button type="button">Search</button>
+      </section>
+      <table>
+        <thead><tr><th>Class</th><th>Schedule</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>CS 4820-001 LEC (17325)</td><td>MoWeFr 9:05AM - 9:55AM<br />Ives Hall 305</td><td>Enrolled</td></tr>
+          <tr><td>MATH 2940-002 LEC (11567)</td><td>MoWeFr 12:20PM - 1:10PM<br />Klarman Hall KG70</td><td>Enrolled</td></tr>
+          <tr><td>INFO 1200-001 LEC (99999)</td><td>TuTh 10:10AM - 11:25AM<br />Uris Hall G01</td><td>Dropped</td></tr>
+        </tbody>
+      </table>
+    </main>
+    <div id="scu-extension-root"></div>
+    <script src="../src/content/schedule.js"></script>
+    <script src="../src/content/homepage-data.js"></script>
+    <script src="../src/content/enrollment.js"></script>
+    <script src="../src/content/dashboard.js"></script>
+    <script>globalThis.SCU.dashboard.refresh();</script>
+  </body>
+</html>
