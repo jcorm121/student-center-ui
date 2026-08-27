@@ -71,7 +71,8 @@
     if (/Enter Search Criteria|Search for Classes/i.test(text) && /Course Number/i.test(text)) {
       return "class-search";
     }
-    return "add-classes";
+    if (/Select classes to add|Add to Cart|Find Classes/i.test(text)) return "add-classes";
+    return "enrollment-step";
   }
 
   function readSessionValue(key, fallback) {
@@ -1546,6 +1547,15 @@
     const root = document.getElementById(ROOT_ID);
     const kind = pageKind();
     if (!root) return false;
+
+    if (kind === "enrollment-step") {
+      root.replaceChildren();
+      root.className = "";
+      root.setAttribute("aria-hidden", "true");
+      document.documentElement.classList.remove("scu-dashboard-mounted");
+      lastSignature = "";
+      return false;
+    }
 
     let rows = table ? extractRows(table) : [];
     if (kind === "home" || kind === "add-classes") cacheScheduleRows(rows);
