@@ -26,6 +26,15 @@
     };
   }
 
+  function academicToolGroup(label) {
+    if (/^Enrollment:\s*(?:Add|Drop|Edit|Swap)$/i.test(label)) return "Enrollment";
+    if (/^(?:Course History|Enrollment Verification|Grades|Transcript:|Transfer Credit:)/i.test(label)) {
+      return "Records";
+    }
+    if (/^(?:Academic Planner|Academic Requirements|Class Schedule)$/i.test(label)) return "Planning";
+    return "More";
+  }
+
   globalThis.SCU = globalThis.SCU || {};
-  globalThis.SCU.homepage = { formatMoney, parseFinancialSummary };
+  globalThis.SCU.homepage = { academicToolGroup, formatMoney, parseFinancialSummary };
 })();

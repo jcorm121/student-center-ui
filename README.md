@@ -7,6 +7,7 @@ A browser extension that improves the interface of Cornell Student Center while 
 - Converts the legacy class table into a visual weekly calendar.
 - Surfaces holds, tasks, enrollment dates, advisor information, and Cornell resources.
 - Summarizes account balances and links to the original bursar and financial-aid workflows.
+- Promotes PeopleSoft’s miscellaneous academic, finance, and profile dropdown options into grouped tools.
 - Keeps home and campus street addresses off the overview while preserving profile-management links.
 - Provides light, dark, and system themes plus a one-click original view.
 

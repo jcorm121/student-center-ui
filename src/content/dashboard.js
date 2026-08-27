@@ -213,6 +213,107 @@
     return button;
   }
 
+  function accessibleLabel(element) {
+    return normalize([
+      ownLabel(element),
+      element.getAttribute?.("aria-label"),
+      element.getAttribute?.("title"),
+      element.getAttribute?.("alt"),
+      element.querySelector?.("img")?.getAttribute("alt"),
+      element.querySelector?.("img")?.getAttribute("title")
+    ].filter(Boolean).join(" "));
+  }
+
+  function findSelectMenu(label) {
+    const labelElement = findTextElement(label);
+    if (!labelElement) return null;
+    const sourceDocument = labelElement.ownerDocument;
+    const htmlLabel = labelElement.closest("label");
+    let select = htmlLabel?.htmlFor ? sourceDocument.getElementById(htmlLabel.htmlFor) : null;
+
+    if (!(select instanceof sourceDocument.defaultView.HTMLSelectElement)) {
+      let container = labelElement.parentElement;
+      for (let depth = 0; depth < 6 && container && !select; depth += 1) {
+        select = container.querySelector("select");
+        container = container.parentElement;
+      }
+    }
+
+    if (!select) return null;
+    const items = [...select.options]
+      .map((option) => ({
+        label: normalize(option.textContent),
+        value: option.value
+      }))
+      .filter((item) => item.label);
+
+    return { label, select, items };
+  }
+
+  function findSelectTrigger(select) {
+    let container = select.parentElement;
+    for (let depth = 0; depth < 6 && container; depth += 1) {
+      const candidates = [...container.querySelectorAll(
+        "a, button, input[type='button'], input[type='image'], input[type='submit']"
+      )].filter((candidate) => !candidate.closest(`#${ROOT_ID}`));
+      const labelled = candidates.find((candidate) => /\b(?:go|submit|continue)\b/i.test(accessibleLabel(candidate)));
+      if (labelled) return labelled;
+      if (candidates.length === 1) return candidates[0];
+      container = container.parentElement;
+    }
+    return null;
+  }
+
+  function invokeSelectItem(menu, item) {
+    const option = [...menu.select.options].find((candidate) => candidate.value === item.value);
+    if (!option) return;
+    menu.select.selectedIndex = option.index;
+    const EventConstructor = menu.select.ownerDocument.defaultView.Event;
+    menu.select.dispatchEvent(new EventConstructor("input", { bubbles: true }));
+    menu.select.dispatchEvent(new EventConstructor("change", { bubbles: true }));
+    findSelectTrigger(menu.select)?.click();
+  }
+
+  function friendlyToolLabel(label) {
+    const labels = {
+      "Enrollment: Add": "Add a class",
+      "Enrollment: Drop": "Drop a class",
+      "Enrollment: Edit": "Edit enrollment",
+      "Enrollment: Swap": "Swap classes",
+      "Transcript: Request Official": "Request official transcript",
+      "Transcript: View Unofficial": "View unofficial transcript",
+      "Transfer Credit: Report": "Transfer credit report"
+    };
+    return labels[label] ?? label;
+  }
+
+  function createSelectActionRow(menu, item) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "scu-link-row";
+    const title = document.createElement("strong");
+    title.textContent = friendlyToolLabel(item.label);
+    const copy = document.createElement("span");
+    copy.append(title);
+    button.append(copy, createIcon("arrow"));
+    button.addEventListener("click", () => invokeSelectItem(menu, item));
+    return button;
+  }
+
+  function appendSelectMenu(card, menuLabel, headingText) {
+    const menu = findSelectMenu(menuLabel);
+    if (!menu?.items.length) return;
+    const section = document.createElement("section");
+    section.className = "scu-card-subsection";
+    const heading = document.createElement("h3");
+    heading.textContent = headingText;
+    const grid = document.createElement("div");
+    grid.className = "scu-link-grid";
+    menu.items.forEach((item) => grid.append(createSelectActionRow(menu, item)));
+    section.append(heading, grid);
+    card.append(section);
+  }
+
   function findScheduleTable() {
     const documents = collectDocuments();
 
@@ -281,6 +382,7 @@
     [
       ["Overview", ROOT_ID, "overview"],
       ["Schedule", "scu-schedule", "plan"],
+      ["Academic tools", "scu-academic-tools", "academics"],
       ["Finances", "scu-finances", "finance"],
       ["Profile", "scu-profile", "profile"]
     ].forEach(([label, target, icon]) => {
@@ -415,6 +517,37 @@
     container.append(card);
   }
 
+  function renderAcademicTools(container) {
+    const menu = findSelectMenu("Other Academic Information");
+    if (!menu?.items.length) return;
+
+    const card = document.createElement("section");
+    card.id = "scu-academic-tools";
+    card.className = "scu-card scu-academic-tools-card";
+    card.innerHTML = '<div class="scu-card-heading"><div><p class="scu-eyebrow">Academics</p><h2>Academic tools</h2></div></div>';
+    const groups = document.createElement("div");
+    groups.className = "scu-tool-groups";
+
+    ["Planning", "Enrollment", "Records", "More"].forEach((groupName) => {
+      const items = menu.items.filter((item) => {
+        return globalThis.SCU.homepage.academicToolGroup(item.label) === groupName;
+      });
+      if (!items.length) return;
+      const group = document.createElement("section");
+      group.className = "scu-tool-group";
+      const heading = document.createElement("h3");
+      heading.textContent = groupName;
+      const list = document.createElement("div");
+      list.className = "scu-tool-list";
+      items.forEach((item) => list.append(createSelectActionRow(menu, item)));
+      group.append(heading, list);
+      groups.append(group);
+    });
+
+    card.append(groups);
+    container.append(card);
+  }
+
   function renderFinances(container, summary) {
     const card = document.createElement("section");
     card.id = "scu-finances";
@@ -468,6 +601,7 @@
       ["View/Pay Bursar Bill", "Open Cornell’s billing service"]
     ].forEach(([label, description]) => links.append(createLinkRow(label, description)));
     card.append(links);
+    appendSelectMenu(card, "Other Finance Information", "More financial tools");
     container.append(card);
   }
 
@@ -507,6 +641,7 @@
       ["User Preferences", "Student Center preferences"]
     ].forEach(([label, description]) => links.append(createLinkRow(label, description)));
     card.append(links);
+    appendSelectMenu(card, "Other Profile Information", "More profile tools");
     container.append(card);
   }
 
@@ -690,6 +825,7 @@
     const primary = document.createElement("div");
     primary.className = "scu-primary-column";
     renderCalendar(primary, schedule);
+    renderAcademicTools(primary);
     renderFinances(primary, financialSummary);
     renderProfile(primary);
 

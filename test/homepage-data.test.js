@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 require("../src/content/schedule.js");
 require("../src/content/homepage-data.js");
 
-const { parseFinancialSummary } = globalThis.SCU.homepage;
+const { academicToolGroup, parseFinancialSummary } = globalThis.SCU.homepage;
 
 assert.deepEqual(
   parseFinancialSummary(
@@ -25,5 +25,10 @@ assert.deepEqual(parseFinancialSummary("No account information available"), {
   futureDue: "—",
   pastDue: false
 });
+
+assert.equal(academicToolGroup("Academic Requirements"), "Planning");
+assert.equal(academicToolGroup("Enrollment: Swap"), "Enrollment");
+assert.equal(academicToolGroup("Transcript: View Unofficial"), "Records");
+assert.equal(academicToolGroup("A Future Cornell Tool"), "More");
 
 console.log("homepage data tests passed");
