@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en" class="scu-extension-enabled" data-scu-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Class Results fixture</title>
+    <link rel="stylesheet" href="../src/content/styles.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Enrollment: Add Classes</h1>
+      <a href="#schedule">My Class Schedule</a>
+      <a href="#add">Add</a>
+      <a href="#drop">Drop</a>
+      <a href="#swap">Swap</a>
+      <a href="#edit">Edit</a>
+      <a href="#term">Term Information</a>
+      <h2>Search Results</h2>
+      <p>The following classes match your search criteria Course Subject: <strong>Computer Science</strong>, Course Number is exactly <strong>3110</strong>, Show Open Classes Only: <strong>Yes</strong></p>
+      <button type="button">New Search</button>
+      <button type="button">Modify Search</button>
+      <h3>3 class section(s) found</h3>
+      <section>
+        <h3>CS 3110 - Functional Programming and Data Structures</h3>
+        <table>
+          <thead><tr><th>Class</th><th>Section</th><th>Days &amp; Times</th><th>Room</th><th>Instructor</th><th>Meeting Dates</th><th>Status</th><th></th></tr></thead>
+          <tbody><tr><td>17297</td><td>001-LEC Regular</td><td>MoWeFr 1:25PM - 2:15PM</td><td>Baker Laboratory 200</td><td>Michael Ryan Clarkson</td><td>08/24/2026 - 12/07/2026</td><td><img alt="Open" /></td><td><button type="button" onclick="document.body.dataset.selected='17297'">Select</button></td></tr></tbody>
+        </table>
+        <table>
+          <thead><tr><th>Class</th><th>Section</th><th>Days &amp; Times</th><th>Room</th><th>Instructor</th><th>Meeting Dates</th><th>Status</th><th></th></tr></thead>
+          <tbody><tr><td>17298</td><td>201-DIS Regular</td><td>Mo 2:55PM - 4:10PM</td><td>Hollister Hall 306</td><td>Michael Ryan Clarkson</td><td>08/24/2026 - 12/07/2026</td><td><img alt="Open" /></td><td><button type="button">Select</button></td></tr></tbody>
+        </table>
+        <table>
+          <thead><tr><th>Class</th><th>Section</th><th>Days &amp; Times</th><th>Room</th><th>Instructor</th><th>Meeting Dates</th><th>Status</th><th></th></tr></thead>
+          <tbody><tr><td>17299</td><td>202-DIS Regular</td><td>Mo 2:55PM - 4:10PM</td><td>Hollister Hall 401</td><td>Michael Ryan Clarkson</td><td>08/24/2026 - 12/07/2026</td><td><img alt="Wait List" /></td><td><button type="button">Select</button></td></tr></tbody>
+        </table>
+      </section>
+    </main>
+    <div id="scu-extension-root"></div>
+    <script>
+      sessionStorage.setItem("scu-schedule-cache-v1", JSON.stringify([
+        { courseText: "MATH 2940-002 LEC (11567)", scheduleText: "MoWeFr 1:25PM - 2:15PM Klarman Hall KG70", statusText: "Enrolled" }
+      ]));
+      sessionStorage.setItem("scu-pending-class-search-v1", JSON.stringify({ query: "CS 3110", advanced: true, submitted: true }));
+    </script>
+    <script src="../src/content/schedule.js"></script>
+    <script src="../src/content/homepage-data.js"></script>
+    <script src="../src/content/enrollment.js"></script>
+    <script src="../src/content/dashboard.js"></script>
+    <script>globalThis.SCU.dashboard.refresh();</script>
+  </body>
+</html>

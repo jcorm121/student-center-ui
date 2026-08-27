@@ -67,7 +67,7 @@
   function pageKind() {
     const text = sourceText();
     if (!/Enrollment:\s*Add Classes/i.test(text)) return "home";
-    if (/Search Results/i.test(text)) return "class-results";
+    if (/Search Results|class section\(s\) found/i.test(text)) return "class-results";
     if (/Enter Search Criteria|Search for Classes/i.test(text) && /Course Number/i.test(text)) {
       return "class-search";
     }
@@ -527,6 +527,112 @@
     return Array.isArray(rows) ? rows : [];
   }
 
+  function findCourseHeading(table) {
+    const pattern = /\b([A-Z&]{2,8}\s*\d{3,4})\s*-\s*([^\n]{2,160})/i;
+    let current = table;
+
+    for (let depth = 0; depth < 8 && current; depth += 1) {
+      let sibling = current.previousElementSibling;
+      while (sibling) {
+        const text = ownLabel(sibling);
+        const match = text.length < 320 ? text.match(pattern) : null;
+        if (match) {
+          return {
+            code: normalize(match[1]).toUpperCase(),
+            title: normalize(match[2]).replace(/\s+(?:Class|Section|Days & Times).*$/i, "")
+          };
+        }
+        sibling = sibling.previousElementSibling;
+      }
+      current = current.parentElement;
+    }
+
+    const query = globalThis.SCU.enrollment.parseClassQuery(pendingSearch()?.query ?? "");
+    return {
+      code: query.subject && query.courseNumber ? `${query.subject} ${query.courseNumber}` : "Course",
+      title: ""
+    };
+  }
+
+  function resultStatus(statusCell) {
+    if (!statusCell) return "Unknown";
+    const images = [...statusCell.querySelectorAll("img")];
+    const description = [
+      accessibleLabel(statusCell),
+      statusCell.className,
+      ...images.flatMap((image) => [image.src, image.className])
+    ].join(" ");
+    return globalThis.SCU.enrollment.normalizeAvailability(description);
+  }
+
+  function extractSearchResults() {
+    const results = [];
+    const seen = new Set();
+    const tables = sourceDocuments.flatMap((sourceDocument) => {
+      return [...sourceDocument.querySelectorAll("table")]
+        .filter((table) => !table.closest(`#${ROOT_ID}`));
+    }).sort((first, second) => {
+      return first.querySelectorAll("th, td").length - second.querySelectorAll("th, td").length;
+    });
+
+    tables.forEach((table) => {
+      const rows = [...table.rows];
+      const header = rows.find((row) => {
+        const labels = [...row.cells].map((cell) => ownLabel(cell).toLowerCase());
+        return labels.includes("class") && labels.includes("section") &&
+          labels.includes("days & times") && labels.includes("room") && labels.includes("status");
+      });
+      if (!header) return;
+
+      const labels = [...header.cells].map((cell) => ownLabel(cell).toLowerCase());
+      const indexOf = (label) => labels.indexOf(label);
+      const course = findCourseHeading(table);
+
+      rows.slice(rows.indexOf(header) + 1).forEach((row) => {
+        const valueAt = (label) => {
+          const index = indexOf(label);
+          return index >= 0 ? ownLabel(row.cells[index]) : "";
+        };
+        const classNumber = valueAt("class").match(/\d{4,6}/)?.[0] ?? "";
+        const sectionLabel = valueAt("section");
+        if (!classNumber || !sectionLabel) return;
+        const key = `${course.code}|${classNumber}|${sectionLabel}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+
+        const section = globalThis.SCU.enrollment.parseSectionLabel(sectionLabel);
+        const daysTimes = valueAt("days & times");
+        const room = valueAt("room");
+        const statusIndex = indexOf("status");
+        const select = [...row.querySelectorAll("a, button, input[type='button'], input[type='submit']")]
+          .find((candidate) => ownLabel(candidate).toLowerCase() === "select") ?? null;
+        const courseText = `${course.code}-${section.section}`;
+        const courseData = globalThis.SCU.schedule.parseCourse(courseText);
+        const meetings = globalThis.SCU.schedule.parseMeetings(`${daysTimes} ${room}`, courseData);
+
+        results.push({
+          key,
+          courseCode: course.code,
+          courseTitle: course.title,
+          classNumber,
+          sectionLabel,
+          section: section.section,
+          component: section.component,
+          type: section.type,
+          daysTimes,
+          room,
+          instructor: valueAt("instructor"),
+          meetingDates: valueAt("meeting dates"),
+          status: resultStatus(statusIndex >= 0 ? row.cells[statusIndex] : null),
+          meetings,
+          select
+        });
+      });
+    });
+
+    return results;
+  }
+
   function colorFor(value) {
     const total = [...value].reduce((sum, character) => sum + character.charCodeAt(0), 0);
     return COLORS[total % COLORS.length];
@@ -790,7 +896,7 @@
   function createSearchPanel(kind) {
     const panel = document.createElement("section");
     panel.className = "scu-class-search-panel";
-    panel.hidden = kind === "home";
+    panel.hidden = kind === "home" || kind === "class-results";
 
     const intro = document.createElement("div");
     intro.className = "scu-search-intro";
@@ -831,19 +937,130 @@
     return panel;
   }
 
-  function renderSearchResultsNotice(container) {
+  function createResultDetail(label, value) {
+    const detail = document.createElement("div");
+    detail.className = "scu-result-detail";
+    const term = document.createElement("span");
+    term.textContent = label;
+    const description = document.createElement("strong");
+    description.textContent = value || "—";
+    detail.append(term, description);
+    return detail;
+  }
+
+  function renderSearchResults(container, results, schedule) {
     const card = document.createElement("section");
-    card.className = "scu-card scu-results-notice";
-    const body = document.createElement("div");
-    body.className = "scu-results-notice-body";
-    body.innerHTML = "<strong>Your Cornell search results are ready</strong><span>The next version will bring result selection and schedule previews into this panel. For now, continue in the original results list.</span>";
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "scu-primary-button";
-    button.textContent = "View search results";
-    button.addEventListener("click", showOriginalView);
-    body.append(button);
-    card.append(body);
+    card.id = "scu-search-results";
+    card.className = "scu-card scu-search-results";
+
+    const heading = document.createElement("div");
+    heading.className = "scu-card-heading scu-results-heading";
+    const title = document.createElement("div");
+    title.innerHTML = '<p class="scu-eyebrow">Class search</p><h2>Search results</h2>';
+    const actions = document.createElement("div");
+    actions.className = "scu-results-actions";
+    ["Modify Search", "New Search"].forEach((label) => {
+      const button = createActionButton(label, { className: "scu-secondary-button" });
+      button.addEventListener("click", () => removeSessionValue(SEARCH_CACHE_KEY), { once: true });
+      actions.append(button);
+    });
+    heading.append(title, actions);
+    card.append(heading);
+
+    if (!results.length) {
+      const empty = document.createElement("div");
+      empty.className = "scu-empty-state";
+      empty.innerHTML = "<strong>No readable sections found</strong><span>Use Original view to continue, then send the page HTML so this result format can be supported.</span>";
+      const original = document.createElement("button");
+      original.type = "button";
+      original.className = "scu-primary-button";
+      original.textContent = "Open original results";
+      original.addEventListener("click", showOriginalView);
+      empty.append(original);
+      card.append(empty);
+      container.append(card);
+      return;
+    }
+
+    const grouped = new Map();
+    results.forEach((result) => {
+      const key = `${result.courseCode}|${result.courseTitle}`;
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key).push(result);
+    });
+
+    grouped.forEach((courseResults) => {
+      const first = courseResults[0];
+      const group = document.createElement("section");
+      group.className = "scu-result-group";
+      const groupHeading = document.createElement("div");
+      groupHeading.className = "scu-result-group-heading";
+      const copy = document.createElement("div");
+      const code = document.createElement("h3");
+      code.textContent = first.courseCode;
+      copy.append(code);
+      if (first.courseTitle) {
+        const courseTitle = document.createElement("p");
+        courseTitle.textContent = first.courseTitle;
+        copy.append(courseTitle);
+      }
+      const count = document.createElement("span");
+      count.className = "scu-count-pill";
+      count.textContent = `${courseResults.length} ${courseResults.length === 1 ? "section" : "sections"}`;
+      groupHeading.append(copy, count);
+
+      const list = document.createElement("div");
+      list.className = "scu-result-list";
+      courseResults.forEach((result) => {
+        const conflicts = globalThis.SCU.enrollment.conflictingCourses(result.meetings, schedule.meetings);
+        const item = document.createElement("article");
+        item.className = "scu-result-item";
+
+        const identity = document.createElement("div");
+        identity.className = "scu-result-identity";
+        const type = document.createElement("strong");
+        type.textContent = result.type || result.component || "Section";
+        const section = document.createElement("span");
+        section.textContent = result.section ? `Section ${result.section}` : result.sectionLabel;
+        const classNumber = document.createElement("small");
+        classNumber.textContent = `Class #${result.classNumber}`;
+        identity.append(type, section, classNumber);
+
+        const details = document.createElement("div");
+        details.className = "scu-result-details";
+        details.append(
+          createResultDetail("When", result.daysTimes),
+          createResultDetail("Where", result.room),
+          createResultDetail("Instructor", result.instructor)
+        );
+
+        const availability = document.createElement("div");
+        availability.className = "scu-result-availability";
+        const status = document.createElement("span");
+        status.className = `scu-availability scu-availability--${result.status.toLowerCase().replace(/\s+/g, "-")}`;
+        status.textContent = result.status;
+        availability.append(status);
+        if (conflicts.length) {
+          const conflict = document.createElement("span");
+          conflict.className = "scu-conflict-badge";
+          conflict.textContent = `Conflicts with ${conflicts.join(", ")}`;
+          availability.append(conflict);
+        }
+
+        const select = document.createElement("button");
+        select.type = "button";
+        select.className = "scu-primary-button scu-select-section";
+        select.textContent = "Select section";
+        select.disabled = !result.select;
+        select.addEventListener("click", () => invokeOriginal(result.select));
+
+        item.append(identity, details, availability, select);
+        list.append(item);
+      });
+      group.append(groupHeading, list);
+      card.append(group);
+    });
+
     container.append(card);
   }
 
@@ -1249,7 +1466,7 @@
     }
   }
 
-  function render(root, rows, kind) {
+  function render(root, rows, kind, searchResults = []) {
     const schedule = globalThis.SCU.schedule.buildSchedule(rows);
     const financialSummary = parseFinancialSummary();
     root.replaceChildren();
@@ -1271,6 +1488,7 @@
     if (kind !== "home") content.classList.add("scu-content--enrollment");
     const primary = document.createElement("div");
     primary.className = "scu-primary-column";
+    if (kind === "class-results") primary.classList.add("scu-primary-column--results");
     renderCalendar(primary, schedule, kind);
 
     if (kind === "home") {
@@ -1278,7 +1496,7 @@
       renderFinances(primary, financialSummary);
       renderProfile(primary);
     } else if (kind === "class-results") {
-      renderSearchResultsNotice(primary);
+      renderSearchResults(primary, searchResults, schedule);
     }
 
     content.append(primary);
@@ -1334,6 +1552,7 @@
     if (kind !== "home" && (!rows.length || kind === "class-results")) {
       rows = cachedScheduleRows();
     }
+    const searchResults = kind === "class-results" ? extractSearchResults() : [];
 
     if (kind === "home" && !rows.length) {
       if (root) {
@@ -1349,6 +1568,13 @@
       kind,
       rows,
       actionCount: interactiveElements().length,
+      searchResults: searchResults.map((result) => ({
+        key: result.key,
+        daysTimes: result.daysTimes,
+        room: result.room,
+        instructor: result.instructor,
+        status: result.status
+      })),
       searchControls: Object.values(findSearchControls()).map((control) => {
         return control?.tagName === "SELECT" ? control.options.length : Boolean(control);
       })
@@ -1356,7 +1582,7 @@
     if (signature === lastSignature && root.childElementCount) return true;
 
     lastSignature = signature;
-    render(root, rows, kind);
+    render(root, rows, kind, searchResults);
     continuePendingSearch(kind);
     return true;
   }

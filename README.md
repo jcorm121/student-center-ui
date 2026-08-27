@@ -7,6 +7,8 @@ A browser extension that improves the interface of Cornell Student Center while 
 - Converts the legacy class table into a visual weekly calendar.
 - Adds an **Add classes** search drawer directly to the calendar.
 - Carries subject/course searches through PeopleSoft’s Add Classes and search-criteria screens while keeping the weekly schedule visible.
+- Presents PeopleSoft search results as compact section cards beside the calendar, including availability, instructors, rooms, and schedule-conflict warnings.
+- Routes section selection through the corresponding original PeopleSoft control so the official enrollment workflow remains intact.
 - Supports direct five-digit class-number entry through Cornell’s existing shopping-cart control.
 - Omits dropped classes from the active calendar and preserves the last visible schedule while enrollment pages load.
 - Surfaces holds, tasks, enrollment dates, advisor information, and Cornell resources.
@@ -37,7 +39,7 @@ node test/homepage-data.test.js
 node test/enrollment.test.js
 ```
 
-Open `test/fixture.html`, `test/enrollment-add-fixture.html`, or `test/class-search-fixture.html` to preview the dashboard and enrollment workflow with synthetic data. The fixtures intentionally contain no real student information.
+Open `test/fixture.html`, `test/enrollment-add-fixture.html`, `test/class-search-fixture.html`, or `test/class-results-fixture.html` to preview the dashboard and enrollment workflow with synthetic data. The fixtures intentionally contain no real student information.
 
 ## Structure
 
