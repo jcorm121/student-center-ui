@@ -412,11 +412,56 @@
   }
 
   function findSelectTrigger(select) {
+    const sourceDocument = select.ownerDocument;
+    const selector = "a, button, input[type='button'], input[type='image'], input[type='submit']";
+    const likelyTriggers = [...sourceDocument.querySelectorAll(selector)].filter((candidate) => {
+      if (candidate.closest(`#${ROOT_ID}`)) return false;
+      const identity = normalize([
+        candidate.id,
+        candidate.getAttribute("name"),
+        candidate.getAttribute("href"),
+        candidate.querySelector("img")?.getAttribute("src"),
+        accessibleLabel(candidate)
+      ].filter(Boolean).join(" "));
+      return /(?:^|[_$\s-])go(?:[_$\s-]|\d|$)|nav[_-]?go/i.test(identity);
+    });
+
+    if (likelyTriggers.length) {
+      const selectRect = select.getBoundingClientRect();
+      const ancestors = new Map();
+      let ancestor = select;
+      let depth = 0;
+      while (ancestor) {
+        ancestors.set(ancestor, depth);
+        ancestor = ancestor.parentElement;
+        depth += 1;
+      }
+
+      const score = (candidate) => {
+        let candidateAncestor = candidate;
+        let candidateDepth = 0;
+        let treeDistance = 100;
+        while (candidateAncestor) {
+          if (ancestors.has(candidateAncestor)) {
+            treeDistance = candidateDepth + ancestors.get(candidateAncestor);
+            break;
+          }
+          candidateAncestor = candidateAncestor.parentElement;
+          candidateDepth += 1;
+        }
+        const rect = candidate.getBoundingClientRect();
+        const horizontal = Math.abs((rect.left + rect.right) / 2 - (selectRect.left + selectRect.right) / 2);
+        const vertical = Math.abs((rect.top + rect.bottom) / 2 - (selectRect.top + selectRect.bottom) / 2);
+        return treeDistance * 100 + horizontal + vertical * 2;
+      };
+
+      return likelyTriggers.sort((first, second) => score(first) - score(second))[0];
+    }
+
     let container = select.parentElement;
-    for (let depth = 0; depth < 6 && container; depth += 1) {
-      const candidates = [...container.querySelectorAll(
-        "a, button, input[type='button'], input[type='image'], input[type='submit']"
-      )].filter((candidate) => !candidate.closest(`#${ROOT_ID}`));
+    for (let depth = 0; depth < 14 && container; depth += 1) {
+      const candidates = [...container.querySelectorAll(selector)]
+        .filter((candidate) => !candidate.closest(`#${ROOT_ID}`));
       const labelled = candidates.find((candidate) => /\b(?:go|submit|continue)\b/i.test(accessibleLabel(candidate)));
       if (labelled) return labelled;
       if (candidates.length === 1) return candidates[0];
@@ -428,11 +473,12 @@
   function invokeSelectItem(menu, item) {
     const option = [...menu.select.options].find((candidate) => candidate.value === item.value);
     if (!option) return;
+    const trigger = findSelectTrigger(menu.select);
     menu.select.selectedIndex = option.index;
     const EventConstructor = menu.select.ownerDocument.defaultView.Event;
     menu.select.dispatchEvent(new EventConstructor("input", { bubbles: true }));
     menu.select.dispatchEvent(new EventConstructor("change", { bubbles: true }));
-    findSelectTrigger(menu.select)?.click();
+    trigger?.click();
   }
 
   function friendlyToolLabel(label) {
