@@ -18,18 +18,19 @@
       <h2>Enter Search Criteria</h2>
       <section>
         <h3>Search for Classes</h3>
-        <label for="subject">Subject</label>
-        <select id="subject"><option value=""></option><option value="CS">CS - Computer Science</option><option value="MATH">MATH - Mathematics</option></select>
-        <label for="course-operator">Course Number</label>
-        <select id="course-operator"><option value="exact">is exactly</option><option value="contains">contains</option></select>
-        <input aria-label="Course Number value" />
-        <label for="career">Course Career</label>
-        <select id="career"><option value=""></option><option value="UGRD">Undergraduate</option></select>
-        <label for="open-only">Show Open Classes Only</label>
-        <input id="open-only" type="checkbox" checked />
+        <label for="SSR_CLSRCH_WRK_SUBJECT_SRCH$0">Subject</label>
+        <select id="SSR_CLSRCH_WRK_SUBJECT_SRCH$0"><option value=""></option><option value="CS">Computer Science</option><option value="MATH">Mathematics</option></select>
+        <label for="SSR_CLSRCH_WRK_SSR_EXACT_MATCH1$1">Course Number</label>
+        <select id="SSR_CLSRCH_WRK_SSR_EXACT_MATCH1$1"><option value="E">is exactly</option><option value="C">contains</option></select>
+        <input id="SSR_CLSRCH_WRK_CATALOG_NBR$1" aria-label="Course Number value" />
+        <label for="SSR_CLSRCH_WRK_ACAD_CAREER$2">Course Career</label>
+        <select id="SSR_CLSRCH_WRK_ACAD_CAREER$2"><option value=""></option><option value="UG">Undergraduate</option></select>
+        <input id="SSR_CLSRCH_WRK_SSR_OPEN_ONLY$chk$3" type="hidden" value="Y" />
+        <label for="SSR_CLSRCH_WRK_SSR_OPEN_ONLY$3">Show Open Classes Only</label>
+        <input id="SSR_CLSRCH_WRK_SSR_OPEN_ONLY$3" type="checkbox" checked onclick="document.querySelector('[id*=SSR_OPEN_ONLY][type=hidden]').value=this.checked?'Y':'N'" />
         <button type="button">Additional Search Criteria</button>
-        <button type="button">Clear</button>
-        <button type="button">Search</button>
+        <input id="CLASS_SRCH_WRK2_SSR_PB_CLEAR" type="button" value="Clear" />
+        <input id="CLASS_SRCH_WRK2_SSR_PB_CLASS_SRCH" type="button" value="Search" onclick="document.body.dataset.action='criteria-search'" />
       </section>
     </main>
     <div id="scu-extension-root"></div>

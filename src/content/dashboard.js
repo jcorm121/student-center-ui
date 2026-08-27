@@ -64,14 +64,40 @@
     }).at(-1) ?? null;
   }
 
+  function findSourceElement(selector) {
+    for (const sourceDocument of sourceDocuments) {
+      const element = sourceDocument.querySelector(selector);
+      if (element && !element.closest(`#${ROOT_ID}`)) return element;
+    }
+    return null;
+  }
+
+  function findPeopleSoftControl(tagName, idPrefix) {
+    return findSourceElement(`${tagName}[id^="${idPrefix}"]`);
+  }
+
+  function findCriteriaSearchAction() {
+    return findPeopleSoftControl("input", "CLASS_SRCH_WRK2_SSR_PB_CLASS_SRCH") ??
+      findButtonAction("Search");
+  }
+
+  function findCriteriaClearAction() {
+    return findPeopleSoftControl("input", "CLASS_SRCH_WRK2_SSR_PB_CLEAR") ??
+      findButtonAction("Clear");
+  }
+
   function pageKind() {
     const text = sourceText();
+    if (
+      /Search Results|class section\(s\) found/i.test(text) &&
+      findSourceElement("input[id^='SSR_PB_SELECT$']")
+    ) return "class-results";
+    if (findPeopleSoftControl("input", "CLASS_SRCH_WRK2_SSR_PB_CLASS_SRCH")) return "class-search";
+    if (
+      findPeopleSoftControl("input", "DERIVED_REGFRM1_SSR_PB_SRCH") ||
+      findPeopleSoftControl("input", "DERIVED_REGFRM1_CLASS_NBR")
+    ) return "add-classes";
     if (!/Enrollment:\s*Add Classes/i.test(text)) return "home";
-    if (/Search Results|class section\(s\) found/i.test(text)) return "class-results";
-    if (/Enter Search Criteria|Search for Classes/i.test(text) && /Course Number/i.test(text)) {
-      return "class-search";
-    }
-    if (/Select classes to add|Add to Cart|Find Classes/i.test(text)) return "add-classes";
     return "enrollment-step";
   }
 
@@ -196,7 +222,8 @@
   }
 
   function findSearchControls() {
-    const subject = nearbyControls("Subject", "select")[0] ?? null;
+    const subject = findPeopleSoftControl("select", "SSR_CLSRCH_WRK_SUBJECT_SRCH") ??
+      nearbyControls("Subject", "select")[0] ?? null;
     const directCourseControls = nearbyControls(
       "Course Number",
       "select, input:not([type='button']):not([type='submit']):not([type='image']):not([type='checkbox']):not([type='radio'])"
@@ -219,16 +246,22 @@
         container = container.parentElement;
       }
     }
-    const courseOperator = directCourseControls.find((control) => control.tagName === "SELECT") ??
+    const courseOperator = findPeopleSoftControl("select", "SSR_CLSRCH_WRK_SSR_EXACT_MATCH1") ??
+      directCourseControls.find((control) => control.tagName === "SELECT") ??
       courseControls.find((control) => control.tagName === "SELECT") ?? null;
-    const courseNumber = courseControls.find((control) => control.tagName === "INPUT") ?? null;
-    const career = nearbyControls("Course Career", "select")[0] ?? null;
-    const openOnly = nearbyControls("Show Open Classes Only", "input[type='checkbox']")[0] ?? null;
+    const courseNumber = findPeopleSoftControl("input", "SSR_CLSRCH_WRK_CATALOG_NBR") ??
+      courseControls.find((control) => control.tagName === "INPUT") ?? null;
+    const career = findPeopleSoftControl("select", "SSR_CLSRCH_WRK_ACAD_CAREER") ??
+      nearbyControls("Course Career", "select")[0] ?? null;
+    const openOnly = findSourceElement("input[type='checkbox'][id^='SSR_CLSRCH_WRK_SSR_OPEN_ONLY']") ??
+      nearbyControls("Show Open Classes Only", "input[type='checkbox']")[0] ?? null;
 
     return { subject, courseOperator, courseNumber, career, openOnly };
   }
 
   function findAddSearchAction() {
+    const peopleSoftAction = findPeopleSoftControl("input", "DERIVED_REGFRM1_SSR_PB_SRCH");
+    if (peopleSoftAction) return peopleSoftAction;
     const local = findNearbyAction("Find Classes", "Search");
     if (local && local.tagName !== "A") return local;
     return findButtonAction("Search");
@@ -240,8 +273,9 @@
       "input:not([type='button']):not([type='submit']):not([type='image'])"
     );
     return {
-      input: controls[0] ?? null,
-      submit: findNearbyAction("Enter Class Nbr", "Enter")
+      input: findPeopleSoftControl("input", "DERIVED_REGFRM1_CLASS_NBR") ?? controls[0] ?? null,
+      submit: findPeopleSoftControl("input", "DERIVED_REGFRM1_SSR_PB_ADDTOLIST2") ??
+        findNearbyAction("Enter Class Nbr", "Enter")
     };
   }
 
@@ -785,7 +819,7 @@
 
     if (kind === "class-search") {
       applyClassQueryToOriginal(query.raw);
-      findButtonAction("Search")?.click();
+      findCriteriaSearchAction()?.click();
     }
   }
 
@@ -849,8 +883,7 @@
       checkbox.type = "checkbox";
       checkbox.checked = controls.openOnly.checked;
       checkbox.addEventListener("change", () => {
-        controls.openOnly.checked = checkbox.checked;
-        dispatchControlChange(controls.openOnly);
+        if (controls.openOnly.checked !== checkbox.checked) controls.openOnly.click();
       });
       field.append(checkbox, "Show open classes only");
       form.append(field);
@@ -862,19 +895,19 @@
     clear.type = "button";
     clear.className = "scu-secondary-button";
     clear.textContent = "Clear";
-    clear.disabled = !findButtonAction("Clear");
+    clear.disabled = !findCriteriaClearAction();
     clear.addEventListener("click", () => {
       removeSessionValue(SEARCH_CACHE_KEY);
-      findButtonAction("Clear")?.click();
+      findCriteriaClearAction()?.click();
     });
     const search = document.createElement("button");
     search.type = "button";
     search.className = "scu-primary-button";
     search.textContent = "Search classes";
-    search.disabled = !findButtonAction("Search");
+    search.disabled = !findCriteriaSearchAction();
     search.addEventListener("click", () => {
       removeSessionValue(SEARCH_CACHE_KEY);
-      findButtonAction("Search")?.click();
+      findCriteriaSearchAction()?.click();
     });
     actions.append(clear, search);
 
@@ -1522,7 +1555,16 @@
     if (!pending?.query) return;
     const parsed = globalThis.SCU.enrollment.parseClassQuery(pending.query);
 
-    if (kind === "add-classes" && !pending.advanced && !parsed.classNumber) {
+    if (kind === "add-classes" && !pending.advanced) {
+      if (parsed.classNumber) {
+        const controls = findClassNumberControls();
+        if (!controls.input || !controls.submit) return;
+        setControlValue(controls.input, parsed.classNumber);
+        savePendingSearch(pending.query, { advanced: true, submitted: true });
+        window.setTimeout(() => controls.submit.click(), 0);
+        return;
+      }
+
       const action = findAddSearchAction();
       if (!action) return;
       savePendingSearch(pending.query, { advanced: true });
@@ -1533,7 +1575,7 @@
     if (kind === "class-search" && !pending.submitted) {
       const applied = applyClassQueryToOriginal(pending.query);
       if (!applied.subjectMatched || !applied.courseMatched) return;
-      const action = findButtonAction("Search");
+      const action = findCriteriaSearchAction();
       if (!action) return;
       savePendingSearch(pending.query, { submitted: true });
       window.setTimeout(() => action.click(), 0);
