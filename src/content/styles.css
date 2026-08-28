@@ -214,8 +214,8 @@
 }
 
 .scu-content--enrollment {
-  grid-template-columns: minmax(0, 1fr);
-  max-width: 1240px;
+  grid-template-columns: minmax(620px, 1fr) minmax(250px, 320px);
+  max-width: 1460px;
 }
 
 .scu-primary-column,
@@ -1316,7 +1316,8 @@
   }
 
   .scu-primary-column--results {
-    grid-template-columns: minmax(650px, 1.25fr) minmax(440px, 0.8fr);
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(650px, 1008px) minmax(440px, 1fr);
   }
 
   .scu-primary-column--results > .scu-card {
