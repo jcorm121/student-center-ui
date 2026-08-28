@@ -344,28 +344,6 @@
   background: var(--scu-canvas);
 }
 
-.scu-quick-search {
-  display: grid;
-  grid-template-columns: 18px minmax(180px, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 7px 7px 13px;
-  border: 1px solid var(--scu-border-strong);
-  border-radius: 10px;
-  background: var(--scu-surface);
-  box-shadow: var(--scu-shadow-sm);
-}
-
-.scu-quick-search > input {
-  min-width: 0;
-  padding: 6px 0;
-  border: 0;
-  outline: 0;
-  color: var(--scu-ink);
-  background: transparent;
-  font: inherit;
-}
-
 .scu-search-fields {
   display: grid;
   grid-template-columns: minmax(180px, 1.3fr) minmax(150px, 0.8fr) minmax(110px, 0.6fr) minmax(170px, 1fr);

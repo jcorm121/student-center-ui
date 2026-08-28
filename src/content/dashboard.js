@@ -855,10 +855,12 @@
     return result;
   }
 
-  function beginEnrollmentSearch(queryValue) {
-    const query = globalThis.SCU.enrollment.parseClassQuery(queryValue);
-    if (!query.raw) return;
-    savePendingSearch(query.raw, { advanced: false, submitted: false });
+  function beginAdvancedEnrollmentSearch() {
+    savePendingSearch("", {
+      mode: "advanced",
+      advanced: false,
+      submitted: false
+    });
     const kind = pageKind();
 
     if (kind === "home") {
@@ -873,19 +875,21 @@
     }
 
     if (kind === "add-classes") {
-      if (query.classNumber) {
-        const controls = findClassNumberControls();
-        setControlValue(controls.input, query.classNumber);
-        controls.submit?.click();
-      } else {
-        findAddSearchAction()?.click();
-      }
+      const action = findAddSearchAction();
+      if (!action) return;
+      savePendingSearch("", { mode: "advanced", advanced: true, submitted: false });
+      activateOriginal(action);
       return;
     }
 
     if (kind === "class-search") {
-      applyClassQueryToOriginal(query.raw);
-      findCriteriaSearchAction()?.click();
+      removeSessionValue(SEARCH_CACHE_KEY);
+      return;
+    }
+
+    if (kind === "class-results") {
+      removeSessionValue(SEARCH_CACHE_KEY);
+      invokeOriginal(findAction("Modify Search") ?? findAction("New Search"));
     }
   }
 
@@ -996,11 +1000,11 @@
   function createSearchPanel(kind) {
     const panel = document.createElement("section");
     panel.className = "scu-class-search-panel";
-    panel.hidden = kind === "home" || kind === "class-results";
+    panel.hidden = kind !== "class-search";
 
     const intro = document.createElement("div");
     intro.className = "scu-search-intro";
-    intro.innerHTML = '<div><strong>Find a class</strong><span>Search by subject and course, or enter a five-digit class number.</span></div>';
+    intro.innerHTML = '<div><strong>Find a class</strong><span>Choose a subject and course number, then refine the results as needed.</span></div>';
     const dismiss = document.createElement("button");
     dismiss.type = "button";
     dismiss.className = "scu-search-dismiss";
@@ -1009,25 +1013,7 @@
     dismiss.addEventListener("click", () => { panel.hidden = true; });
     intro.append(dismiss);
 
-    const quickForm = document.createElement("form");
-    quickForm.className = "scu-quick-search";
-    const input = document.createElement("input");
-    input.type = "search";
-    input.autocomplete = "off";
-    input.placeholder = "Try CS 4820 or class #17325";
-    input.setAttribute("aria-label", "Class search");
-    input.value = pendingSearch()?.query ?? "";
-    const submit = document.createElement("button");
-    submit.type = "submit";
-    submit.className = "scu-primary-button";
-    submit.textContent = kind === "class-search" ? "Apply search" : "Continue";
-    quickForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      beginEnrollmentSearch(input.value);
-    });
-    quickForm.append(createIcon("search"), input, submit);
-
-    panel.append(intro, quickForm);
+    panel.append(intro);
     if (kind === "class-search") renderFullSearchForm(panel);
 
     const note = document.createElement("p");
@@ -1186,8 +1172,15 @@
     heading.append(actions);
     const searchPanel = createSearchPanel(kind);
     addButton.addEventListener("click", () => {
-      searchPanel.hidden = !searchPanel.hidden;
-      if (!searchPanel.hidden) searchPanel.querySelector("input[type='search']")?.focus();
+      if (kind !== "class-search") {
+        addButton.disabled = true;
+        addButton.replaceChildren(createIcon("plus"), "Opening search…");
+        beginAdvancedEnrollmentSearch();
+        return;
+      }
+
+      searchPanel.hidden = false;
+      searchPanel.querySelector("select, input")?.focus();
     });
     card.append(heading, searchPanel);
 
@@ -1618,7 +1611,22 @@
 
   function continuePendingSearch(kind) {
     const pending = pendingSearch();
-    if (!pending?.query) return;
+    if (!pending) return;
+
+    if (pending.mode === "advanced") {
+      if (kind === "add-classes" && !pending.advanced) {
+        const action = findAddSearchAction();
+        if (!action) return;
+        savePendingSearch("", { mode: "advanced", advanced: true, submitted: false });
+        window.setTimeout(() => activateOriginal(action), 0);
+        return;
+      }
+
+      if (kind === "class-search") removeSessionValue(SEARCH_CACHE_KEY);
+      return;
+    }
+
+    if (!pending.query) return;
     const parsed = globalThis.SCU.enrollment.parseClassQuery(pending.query);
 
     if (kind === "add-classes" && !pending.advanced) {
@@ -1627,14 +1635,14 @@
         if (!controls.input || !controls.submit) return;
         setControlValue(controls.input, parsed.classNumber);
         savePendingSearch(pending.query, { advanced: true, submitted: true });
-        window.setTimeout(() => controls.submit.click(), 0);
+        window.setTimeout(() => activateOriginal(controls.submit), 0);
         return;
       }
 
       const action = findAddSearchAction();
       if (!action) return;
       savePendingSearch(pending.query, { advanced: true });
-      window.setTimeout(() => action.click(), 0);
+      window.setTimeout(() => activateOriginal(action), 0);
       return;
     }
 
@@ -1644,7 +1652,7 @@
       const action = findCriteriaSearchAction();
       if (!action) return;
       savePendingSearch(pending.query, { submitted: true });
-      window.setTimeout(() => action.click(), 0);
+      window.setTimeout(() => activateOriginal(action), 0);
     }
   }
 
