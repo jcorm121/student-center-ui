@@ -1,7 +1,7 @@
 (() => {
   const ROOT_ID = "scu-extension-root";
   const RETURN_ID = "scu-return-modern";
-  const SCHEDULE_CACHE_KEY = "scu-schedule-cache-v1";
+  const SCHEDULE_CACHE_KEY = "scu-schedule-cache-v2";
   const SEARCH_CACHE_KEY = "scu-pending-class-search-v1";
   const PAGE_ACTION_EVENT = "scu:invoke-page-action";
   const ACTION_LABELS = ["Search", "Plan", "Enroll", "My Academics"];
@@ -585,6 +585,27 @@
     return { table: null, documents };
   }
 
+  function statusMetadata(element) {
+    if (!element) return "";
+    const images = [...element.querySelectorAll("img")];
+    return normalize([
+      accessibleLabel(element),
+      element.id,
+      element.className,
+      ...images.flatMap((image) => [
+        image.getAttribute("alt"),
+        image.getAttribute("title"),
+        image.getAttribute("src"),
+        image.id,
+        image.className
+      ])
+    ].filter(Boolean).join(" "));
+  }
+
+  function hasDroppedStatus(element) {
+    return /\bdropped\b|status[_-]?dropped/i.test(statusMetadata(element));
+  }
+
   function extractRows(table) {
     const rows = [...table.rows];
     const header = rows.find((row) => {
@@ -599,12 +620,13 @@
         return {
           courseText: ownLabel(courseCell),
           scheduleText: rowText,
-          statusText: cells.map(ownLabel).join(" ")
+          statusText: statusMetadata(row),
+          dropped: hasDroppedStatus(row)
         };
       }).filter((row) => {
         return row.courseText &&
           (/\d{1,2}:\d{2}\s*(?:AM|PM)/i.test(row.scheduleText) || /\bTBA\b/i.test(row.scheduleText)) &&
-          !/\bDropped\b/i.test(row.statusText);
+          !row.dropped;
       });
     }
 
@@ -614,12 +636,16 @@
     const statusIndex = labels.findIndex((label) => /Status/i.test(label));
 
     return rows.slice(rows.indexOf(header) + 1)
-      .map((row) => ({
-        courseText: ownLabel(row.cells[classIndex]),
-        scheduleText: ownLabel(row.cells[scheduleIndex]),
-        statusText: statusIndex >= 0 ? ownLabel(row.cells[statusIndex]) : ownLabel(row)
-      }))
-      .filter((row) => row.courseText && row.scheduleText && !/\bDropped\b/i.test(row.statusText));
+      .map((row) => {
+        const statusElement = statusIndex >= 0 ? row.cells[statusIndex] : row;
+        return {
+          courseText: ownLabel(row.cells[classIndex]),
+          scheduleText: ownLabel(row.cells[scheduleIndex]),
+          statusText: statusMetadata(statusElement),
+          dropped: hasDroppedStatus(statusElement)
+        };
+      })
+      .filter((row) => row.courseText && row.scheduleText && !row.dropped);
   }
 
   function cacheScheduleRows(rows) {
@@ -660,13 +686,7 @@
 
   function resultStatus(statusCell) {
     if (!statusCell) return "Unknown";
-    const images = [...statusCell.querySelectorAll("img")];
-    const description = [
-      accessibleLabel(statusCell),
-      statusCell.className,
-      ...images.flatMap((image) => [image.src, image.className])
-    ].join(" ");
-    return globalThis.SCU.enrollment.normalizeAvailability(description);
+    return globalThis.SCU.enrollment.normalizeAvailability(statusMetadata(statusCell));
   }
 
   function extractSearchResults() {
