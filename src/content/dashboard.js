@@ -1150,6 +1150,29 @@
     container.append(card);
   }
 
+  function renderSearchResultsPlaceholder(container) {
+    const card = document.createElement("section");
+    card.className = "scu-card scu-search-results-placeholder";
+
+    const heading = document.createElement("div");
+    heading.className = "scu-card-heading";
+    heading.innerHTML = '<div><p class="scu-eyebrow">Class search</p><h2>Search results</h2></div>';
+
+    const empty = document.createElement("div");
+    empty.className = "scu-empty-state";
+    const icon = document.createElement("span");
+    icon.className = "scu-results-placeholder-icon";
+    icon.append(createIcon("search"));
+    const title = document.createElement("strong");
+    title.textContent = "Results will appear here";
+    const description = document.createElement("span");
+    description.textContent = "Choose your search criteria to find available class sections.";
+    empty.append(icon, title, description);
+
+    card.append(heading, empty);
+    container.append(card);
+  }
+
   function renderCalendar(container, schedule, kind) {
     const card = document.createElement("section");
     card.id = "scu-schedule";
@@ -1601,6 +1624,12 @@
       renderTodo(secondary);
       renderAdvisor(secondary);
       renderResources(secondary);
+      content.append(secondary);
+    } else if (kind === "add-classes" || kind === "class-search") {
+      const secondary = document.createElement("aside");
+      secondary.className = "scu-enrollment-secondary";
+      secondary.setAttribute("aria-label", "Class search results");
+      renderSearchResultsPlaceholder(secondary);
       content.append(secondary);
     }
 

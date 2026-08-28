@@ -219,10 +219,28 @@
 }
 
 .scu-primary-column,
-.scu-secondary-column {
+.scu-secondary-column,
+.scu-enrollment-secondary {
   display: grid;
   align-content: start;
   gap: 20px;
+}
+
+.scu-search-results-placeholder .scu-empty-state {
+  min-height: 320px;
+  padding: 42px 24px;
+}
+
+.scu-results-placeholder-icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  margin-bottom: 8px;
+  place-items: center;
+  border: 1px solid var(--scu-border);
+  border-radius: 50%;
+  color: var(--scu-subtle);
+  background: var(--scu-canvas);
 }
 
 .scu-card {
