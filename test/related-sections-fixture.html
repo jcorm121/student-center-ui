@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en" class="scu-extension-enabled" data-scu-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Related Sections fixture</title>
+    <link rel="stylesheet" href="../src/content/styles.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Enrollment: Add Classes</h1>
+      <p>Fall 2026 | Undergraduate | Cornell University</p>
+      <h2>CS 3110 - Functional Programming and Data Structures</h2>
+      <p><strong>Lecture selected</strong> Section 001 MoWeFr 1:25PM - 2:15PM Baker Laboratory 200</p>
+      <h3>Select Discussion section (Required):</h3>
+      <a href="#view-all">View All</a>
+      <table>
+        <thead><tr><th></th><th>Class Nbr</th><th>Section</th><th>Schedule</th><th>Room</th><th>Instructor</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td><input name="related" type="radio" /></td><td>17298</td><td>201</td><td>Mo 2:55PM - 4:10PM</td><td>Hollister Hall 306</td><td>M. Clarkson</td><td><img alt="Open" /></td></tr>
+          <tr><td><input name="related" type="radio" /></td><td>17299</td><td>202</td><td>Mo 2:55PM - 4:10PM</td><td>Hollister Hall 401</td><td>M. Clarkson</td><td><img alt="Open" /></td></tr>
+          <tr><td><input name="related" type="radio" /></td><td>17300</td><td>203</td><td>Tu 8:40AM - 9:55AM</td><td>Hollister Hall 306</td><td>M. Clarkson</td><td><img alt="Closed" /></td></tr>
+        </tbody>
+      </table>
+      <input type="button" value="Cancel" onclick="document.body.dataset.action='cancel'" />
+      <input type="button" value="Next" onclick="document.body.dataset.action='next'" />
+    </main>
+    <div id="scu-extension-root"></div>
+    <script>
+      sessionStorage.setItem("scu-schedule-cache-v1", JSON.stringify([
+        { courseText: "MATH 2940-002 LEC (11567)", scheduleText: "Mo 2:55PM - 4:10PM Klarman Hall KG70", statusText: "Enrolled" }
+      ]));
+    </script>
+    <script src="../src/content/schedule.js"></script>
+    <script src="../src/content/homepage-data.js"></script>
+    <script src="../src/content/enrollment.js"></script>
+    <script src="../src/content/dashboard.js"></script>
+    <script>globalThis.SCU.dashboard.refresh();</script>
+  </body>
+</html>

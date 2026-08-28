@@ -89,6 +89,9 @@
 
   function pageKind() {
     const text = sourceText();
+    if (/Select\s+.+?\s+section\s*\(Required\)/i.test(text) && findRelatedSectionsTable()) {
+      return "related-sections";
+    }
     if (
       /Search Results|class section\(s\) found/i.test(text) &&
       findSourceElement("input[id^='SSR_PB_SELECT$']")
@@ -734,6 +737,90 @@
     return results;
   }
 
+  function findRelatedSectionsTable() {
+    return sourceDocuments.flatMap((sourceDocument) => {
+      return [...sourceDocument.querySelectorAll("table")]
+        .filter((table) => !table.closest(`#${ROOT_ID}`));
+    }).find((table) => {
+      const rows = [...table.rows];
+      const header = rows.find((row) => {
+        const labels = [...row.cells].map((cell) => ownLabel(cell).toLowerCase());
+        return labels.includes("class nbr") && labels.includes("section") &&
+          labels.includes("schedule") && labels.includes("room") && labels.includes("status");
+      });
+      return Boolean(header && table.querySelector("input[type='radio']"));
+    }) ?? null;
+  }
+
+  function relatedCourse(table) {
+    const match = sourceText().match(
+      /\b([A-Z&]{2,8}\s*\d{3,4})\s*-\s*(.{2,100}?)(?=\s+(?:Lecture|Discussion|Lab|Project)\s+selected\b|\s+Select\s+.+?\s+section)/i
+    );
+    if (match) {
+      return {
+        code: normalize(match[1]).toUpperCase(),
+        title: normalize(match[2])
+      };
+    }
+    return findCourseHeading(table);
+  }
+
+  function extractRelatedSections() {
+    const table = findRelatedSectionsTable();
+    if (!table) return null;
+    const rows = [...table.rows];
+    const header = rows.find((row) => {
+      const labels = [...row.cells].map((cell) => ownLabel(cell).toLowerCase());
+      return labels.includes("class nbr") && labels.includes("section") &&
+        labels.includes("schedule") && labels.includes("room") && labels.includes("status");
+    });
+    if (!header) return null;
+
+    const labels = [...header.cells].map((cell) => ownLabel(cell).toLowerCase());
+    const indexOf = (label) => labels.indexOf(label);
+    const requirement = sourceText().match(/Select\s+(.+?)\s+section\s*\(Required\)/i)?.[1] ?? "related";
+    const course = relatedCourse(table);
+    const sections = rows.slice(rows.indexOf(header) + 1).map((row) => {
+      const radio = row.querySelector("input[type='radio']");
+      if (!radio) return null;
+      const valueAt = (label) => {
+        const index = indexOf(label);
+        return index >= 0 ? ownLabel(row.cells[index]) : "";
+      };
+      const classNumber = valueAt("class nbr").match(/\d{4,6}/)?.[0] ?? "";
+      const sectionLabel = valueAt("section");
+      const parsedSection = globalThis.SCU.enrollment.parseSectionLabel(sectionLabel);
+      const scheduleText = valueAt("schedule");
+      const room = valueAt("room");
+      const courseData = globalThis.SCU.schedule.parseCourse(
+        `${course.code}-${parsedSection.section} ${parsedSection.component}`
+      );
+      return {
+        key: `${classNumber}|${sectionLabel}`,
+        classNumber,
+        section: parsedSection.section || sectionLabel,
+        component: parsedSection.component,
+        type: parsedSection.type,
+        scheduleText,
+        room,
+        instructor: valueAt("instructor"),
+        status: resultStatus(indexOf("status") >= 0 ? row.cells[indexOf("status")] : null),
+        meetings: globalThis.SCU.schedule.parseMeetings(`${scheduleText} ${room}`, courseData),
+        radio,
+        selected: radio.checked
+      };
+    }).filter(Boolean);
+
+    return {
+      course,
+      requirement: normalize(requirement),
+      sections,
+      viewAll: findAction("View All"),
+      cancel: findAction("Cancel"),
+      next: findAction("Next")
+    };
+  }
+
   function colorFor(value) {
     const total = [...value].reduce((sum, character) => sum + character.charCodeAt(0), 0);
     return COLORS[total % COLORS.length];
@@ -1173,6 +1260,125 @@
     container.append(card);
   }
 
+  function renderRelatedSections(container, related, schedule) {
+    const card = document.createElement("section");
+    card.className = "scu-card scu-related-sections";
+
+    const heading = document.createElement("div");
+    heading.className = "scu-card-heading scu-related-heading";
+    const title = document.createElement("div");
+    const eyebrow = document.createElement("p");
+    eyebrow.className = "scu-eyebrow";
+    eyebrow.textContent = related.course.code;
+    const headingText = document.createElement("h2");
+    headingText.textContent = `Choose a ${related.requirement.toLowerCase()}`;
+    title.append(eyebrow, headingText);
+    heading.append(title);
+
+    if (related.viewAll) {
+      const viewAll = document.createElement("button");
+      viewAll.type = "button";
+      viewAll.className = "scu-text-button";
+      viewAll.textContent = "Show all";
+      viewAll.addEventListener("click", () => invokeOriginal(related.viewAll));
+      heading.append(viewAll);
+    }
+    card.append(heading);
+
+    if (related.course.title) {
+      const courseTitle = document.createElement("p");
+      courseTitle.className = "scu-related-course-title";
+      courseTitle.textContent = related.course.title;
+      card.append(courseTitle);
+    }
+
+    const list = document.createElement("div");
+    list.className = "scu-related-list";
+    const continueButton = document.createElement("button");
+    continueButton.type = "button";
+    continueButton.className = "scu-primary-button";
+    continueButton.textContent = "Continue";
+    continueButton.disabled = !related.next || !related.sections.some((section) => section.selected);
+    continueButton.addEventListener("click", () => invokeOriginal(related.next));
+
+    related.sections.forEach((section) => {
+      const conflicts = globalThis.SCU.enrollment.conflictingCourses(section.meetings, schedule.meetings);
+      const option = document.createElement("button");
+      option.type = "button";
+      option.className = "scu-related-option";
+      option.disabled = section.radio.disabled;
+      option.setAttribute("aria-pressed", String(section.selected));
+
+      const top = document.createElement("span");
+      top.className = "scu-related-option-heading";
+      const identity = document.createElement("span");
+      identity.className = "scu-related-option-identity";
+      const radio = document.createElement("span");
+      radio.className = "scu-radio-indicator";
+      const name = document.createElement("strong");
+      const type = section.type || section.component || related.requirement;
+      name.textContent = `${type} ${section.section}`;
+      const classNumber = document.createElement("small");
+      classNumber.textContent = `Class #${section.classNumber}`;
+      identity.append(radio, name, classNumber);
+      const status = document.createElement("span");
+      status.className = `scu-availability scu-availability--${section.status.toLowerCase().replace(/\s+/g, "-")}`;
+      status.textContent = section.status;
+      top.append(identity, status);
+
+      const details = document.createElement("span");
+      details.className = "scu-related-option-details";
+      const time = document.createElement("span");
+      time.textContent = section.scheduleText || "Time not available";
+      const room = document.createElement("span");
+      room.textContent = section.room || "Room not assigned";
+      details.append(time, room);
+      if (section.instructor) {
+        const instructor = document.createElement("span");
+        instructor.textContent = section.instructor;
+        details.append(instructor);
+      }
+
+      option.append(top, details);
+      if (conflicts.length) {
+        const conflict = document.createElement("span");
+        conflict.className = "scu-conflict-badge";
+        conflict.textContent = `Conflicts with ${conflicts.join(", ")}`;
+        option.append(conflict);
+      }
+
+      option.addEventListener("click", () => {
+        activateOriginal(section.radio);
+        list.querySelectorAll(".scu-related-option").forEach((candidate) => {
+          candidate.setAttribute("aria-pressed", "false");
+        });
+        option.setAttribute("aria-pressed", "true");
+        continueButton.disabled = !related.next;
+      });
+      list.append(option);
+    });
+
+    if (!related.sections.length) {
+      const empty = document.createElement("div");
+      empty.className = "scu-empty-state";
+      empty.innerHTML = "<strong>No related sections found</strong><span>Open the original view to continue this enrollment.</span>";
+      list.append(empty);
+    }
+    card.append(list);
+
+    const actions = document.createElement("div");
+    actions.className = "scu-related-actions";
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "scu-secondary-button";
+    cancel.textContent = "Cancel";
+    cancel.disabled = !related.cancel;
+    cancel.addEventListener("click", () => invokeOriginal(related.cancel));
+    actions.append(cancel, continueButton);
+    card.append(actions);
+    container.append(card);
+  }
+
   function renderCalendar(container, schedule, kind) {
     const card = document.createElement("section");
     card.id = "scu-schedule";
@@ -1582,7 +1788,7 @@
     }
   }
 
-  function render(root, rows, kind, searchResults = []) {
+  function render(root, rows, kind, searchResults = [], relatedSections = null) {
     const schedule = globalThis.SCU.schedule.buildSchedule(rows);
     const financialSummary = parseFinancialSummary();
     root.replaceChildren();
@@ -1630,6 +1836,12 @@
       secondary.className = "scu-enrollment-secondary";
       secondary.setAttribute("aria-label", "Class search results");
       renderSearchResultsPlaceholder(secondary);
+      content.append(secondary);
+    } else if (kind === "related-sections" && relatedSections) {
+      const secondary = document.createElement("aside");
+      secondary.className = "scu-enrollment-secondary";
+      secondary.setAttribute("aria-label", "Required related sections");
+      renderRelatedSections(secondary, relatedSections, schedule);
       content.append(secondary);
     }
 
@@ -1708,6 +1920,7 @@
       rows = cachedScheduleRows();
     }
     const searchResults = kind === "class-results" ? extractSearchResults() : [];
+    const relatedSections = kind === "related-sections" ? extractRelatedSections() : null;
 
     if (kind === "home" && !rows.length) {
       if (root) {
@@ -1730,6 +1943,11 @@
         instructor: result.instructor,
         status: result.status
       })),
+      relatedSections: relatedSections?.sections.map((section) => ({
+        key: section.key,
+        selected: section.radio.checked,
+        status: section.status
+      })) ?? [],
       searchControls: Object.values(findSearchControls()).map((control) => {
         return control?.tagName === "SELECT" ? control.options.length : Boolean(control);
       })
@@ -1737,7 +1955,7 @@
     if (signature === lastSignature && root.childElementCount) return true;
 
     lastSignature = signature;
-    render(root, rows, kind, searchResults);
+    render(root, rows, kind, searchResults, relatedSections);
     continuePendingSearch(kind);
     return true;
   }
