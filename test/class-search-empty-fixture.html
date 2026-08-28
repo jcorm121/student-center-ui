@@ -32,6 +32,25 @@
     <script src="../src/content/homepage-data.js"></script>
     <script src="../src/content/enrollment.js"></script>
     <script src="../src/content/dashboard.js"></script>
-    <script>globalThis.SCU.dashboard.refresh();</script>
+    <script>
+      globalThis.SCU.dashboard.refresh();
+
+      const mirroredCourseNumber = document.querySelector("#scu-extension-root .scu-search-fields input[type='text']");
+      const originalSearchPanel = document.querySelector("#scu-extension-root .scu-class-search-panel");
+      mirroredCourseNumber.focus();
+      mirroredCourseNumber.value = "3110";
+      mirroredCourseNumber.dispatchEvent(new Event("input", { bubbles: true }));
+      globalThis.SCU.dashboard.refresh();
+
+      document.documentElement.dataset.searchPanelStable = String(
+        originalSearchPanel === document.querySelector("#scu-extension-root .scu-class-search-panel")
+      );
+      document.documentElement.dataset.searchFocusPreserved = String(
+        document.activeElement === mirroredCourseNumber
+      );
+      document.documentElement.dataset.submittedQueryPreserved = String(
+        document.querySelector(".scu-search-results-placeholder .scu-empty-state")?.textContent.includes("4410")
+      );
+    </script>
   </body>
 </html>

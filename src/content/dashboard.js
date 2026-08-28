@@ -2007,8 +2007,6 @@
         return {
           nodeId: sourceNodeId(control),
           tag: control.tagName,
-          value: control.value,
-          checked: control.type === "checkbox" ? control.checked : undefined,
           optionCount: control.tagName === "SELECT" ? control.options.length : undefined
         };
       })
