@@ -243,6 +243,12 @@
   background: var(--scu-canvas);
 }
 
+.scu-results-placeholder-icon--warning {
+  border-color: color-mix(in srgb, var(--scu-warning) 28%, var(--scu-border));
+  color: var(--scu-warning);
+  background: color-mix(in srgb, var(--scu-warning) 9%, var(--scu-surface));
+}
+
 .scu-related-heading h2,
 .scu-related-heading p {
   margin: 0;

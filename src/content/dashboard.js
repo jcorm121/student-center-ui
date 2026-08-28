@@ -8,8 +8,19 @@
   const COLORS = ["blue", "violet", "teal", "orange", "rose", "indigo"];
   let lastSignature = "";
   let sourceDocuments = [document];
+  const sourceNodeIds = new WeakMap();
+  let nextSourceNodeId = 1;
 
   const normalize = (value) => globalThis.SCU.schedule.normalize(value);
+
+  function sourceNodeId(node) {
+    if (!node) return null;
+    if (!sourceNodeIds.has(node)) {
+      sourceNodeIds.set(node, nextSourceNodeId);
+      nextSourceNodeId += 1;
+    }
+    return sourceNodeIds.get(node);
+  }
 
   function ownLabel(element) {
     if (!element) return "";
@@ -281,6 +292,17 @@
       submit: findPeopleSoftControl("input", "DERIVED_REGFRM1_SSR_PB_ADDTOLIST2") ??
         findNearbyAction("Enter Class Nbr", "Enter")
     };
+  }
+
+  function hasEmptySearchResults() {
+    return /search returns no results that match the criteria specified/i.test(sourceText());
+  }
+
+  function currentSearchDescription() {
+    const controls = findSearchControls();
+    const subject = normalize(controls.subject?.selectedOptions?.[0]?.textContent);
+    const courseNumber = normalize(controls.courseNumber?.value);
+    return [subject, courseNumber].filter(Boolean).join(" ");
   }
 
   function extractAdvisorNames() {
@@ -1257,7 +1279,7 @@
     container.append(card);
   }
 
-  function renderSearchResultsPlaceholder(container) {
+  function renderSearchResultsPlaceholder(container, emptySearch = false) {
     const card = document.createElement("section");
     card.className = "scu-card scu-search-results-placeholder";
 
@@ -1267,13 +1289,23 @@
 
     const empty = document.createElement("div");
     empty.className = "scu-empty-state";
+    if (emptySearch) empty.setAttribute("role", "status");
     const icon = document.createElement("span");
     icon.className = "scu-results-placeholder-icon";
+    if (emptySearch) icon.classList.add("scu-results-placeholder-icon--warning");
     icon.append(createIcon("search"));
     const title = document.createElement("strong");
-    title.textContent = "Results will appear here";
+    title.textContent = emptySearch ? "No classes found" : "Results will appear here";
     const description = document.createElement("span");
-    description.textContent = "Choose your search criteria to find available class sections.";
+    if (emptySearch) {
+      const query = currentSearchDescription();
+      const openOnly = findSearchControls().openOnly?.checked;
+      description.textContent = query
+        ? `No ${openOnly ? "open " : ""}sections matched ${query}. Change the filters and search again.`
+        : "No sections matched these filters. Change the criteria and search again.";
+    } else {
+      description.textContent = "Choose your search criteria to find available class sections.";
+    }
     empty.append(icon, title, description);
 
     card.append(heading, empty);
@@ -1855,7 +1887,7 @@
       const secondary = document.createElement("aside");
       secondary.className = "scu-enrollment-secondary";
       secondary.setAttribute("aria-label", "Class search results");
-      renderSearchResultsPlaceholder(secondary);
+      renderSearchResultsPlaceholder(secondary, kind === "class-search" && hasEmptySearchResults());
       content.append(secondary);
     } else if (kind === "related-sections" && relatedSections) {
       const secondary = document.createElement("aside");
@@ -1941,6 +1973,7 @@
     }
     const searchResults = kind === "class-results" ? extractSearchResults() : [];
     const relatedSections = kind === "related-sections" ? extractRelatedSections() : null;
+    const emptySearchResults = kind === "class-search" && hasEmptySearchResults();
 
     if (kind === "home" && !rows.length) {
       if (root) {
@@ -1968,8 +2001,16 @@
         selected: section.radio.checked,
         status: section.status
       })) ?? [],
+      emptySearchResults,
       searchControls: Object.values(findSearchControls()).map((control) => {
-        return control?.tagName === "SELECT" ? control.options.length : Boolean(control);
+        if (!control) return null;
+        return {
+          nodeId: sourceNodeId(control),
+          tag: control.tagName,
+          value: control.value,
+          checked: control.type === "checkbox" ? control.checked : undefined,
+          optionCount: control.tagName === "SELECT" ? control.options.length : undefined
+        };
       })
     });
     if (signature === lastSignature && root.childElementCount) return true;

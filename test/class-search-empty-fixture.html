@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en" class="scu-extension-enabled" data-scu-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Empty Class Search fixture</title>
+    <link rel="stylesheet" href="../src/content/styles.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Enrollment: Add Classes</h1>
+      <h2>Enter Search Criteria</h2>
+      <p>The search returns no results that match the criteria specified.</p>
+      <section>
+        <h3>Search for Classes</h3>
+        <label for="SSR_CLSRCH_WRK_SUBJECT_SRCH$0">Subject</label>
+        <select id="SSR_CLSRCH_WRK_SUBJECT_SRCH$0"><option value=""></option><option value="CS" selected>Computer Science</option><option value="MATH">Mathematics</option></select>
+        <label for="SSR_CLSRCH_WRK_SSR_EXACT_MATCH1$1">Course Number</label>
+        <select id="SSR_CLSRCH_WRK_SSR_EXACT_MATCH1$1"><option value="E" selected>is exactly</option><option value="C">contains</option></select>
+        <input id="SSR_CLSRCH_WRK_CATALOG_NBR$1" aria-label="Course Number value" value="4410" />
+        <label for="SSR_CLSRCH_WRK_ACAD_CAREER$2">Course Career</label>
+        <select id="SSR_CLSRCH_WRK_ACAD_CAREER$2"><option value=""></option><option value="UG">Undergraduate</option></select>
+        <label for="SSR_CLSRCH_WRK_SSR_OPEN_ONLY$3">Show Open Classes Only</label>
+        <input id="SSR_CLSRCH_WRK_SSR_OPEN_ONLY$3" type="checkbox" checked />
+        <button type="button">Additional Search Criteria</button>
+        <input id="CLASS_SRCH_WRK2_SSR_PB_CLEAR" type="button" value="Clear" />
+        <input id="CLASS_SRCH_WRK2_SSR_PB_CLASS_SRCH" type="button" value="Search" />
+      </section>
+    </main>
+    <div id="scu-extension-root"></div>
+    <script src="../src/content/schedule.js"></script>
+    <script src="../src/content/homepage-data.js"></script>
+    <script src="../src/content/enrollment.js"></script>
+    <script src="../src/content/dashboard.js"></script>
+    <script>globalThis.SCU.dashboard.refresh();</script>
+  </body>
+</html>
