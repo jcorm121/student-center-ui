@@ -3,6 +3,7 @@
   const RETURN_ID = "scu-return-modern";
   const SCHEDULE_CACHE_KEY = "scu-schedule-cache-v1";
   const SEARCH_CACHE_KEY = "scu-pending-class-search-v1";
+  const PAGE_ACTION_EVENT = "scu:invoke-page-action";
   const ACTION_LABELS = ["Search", "Plan", "Enroll", "My Academics"];
   const COLORS = ["blue", "violet", "teal", "orange", "rose", "indigo"];
   let lastSignature = "";
@@ -322,7 +323,19 @@
   function invokeOriginal(element) {
     if (!element) return;
     element.scrollIntoView({ block: "center" });
-    element.click();
+    activateOriginal(element);
+  }
+
+  function activateOriginal(element) {
+    if (!element) return false;
+    const EventConstructor = element.ownerDocument.defaultView.Event;
+    const event = new EventConstructor(PAGE_ACTION_EVENT, {
+      bubbles: false,
+      cancelable: true
+    });
+    const handledInPage = !element.dispatchEvent(event);
+    if (!handledInPage) element.click();
+    return true;
   }
 
   function createActionButton(label, options = {}) {
@@ -485,8 +498,7 @@
     const EventConstructor = menu.select.ownerDocument.defaultView.Event;
     menu.select.dispatchEvent(new EventConstructor("input", { bubbles: true }));
     menu.select.dispatchEvent(new EventConstructor("change", { bubbles: true }));
-    const clickTarget = trigger?.querySelector?.("img") ?? trigger;
-    clickTarget?.click();
+    activateOriginal(trigger);
   }
 
   function friendlyToolLabel(label) {
