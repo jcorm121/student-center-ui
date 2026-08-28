@@ -45,7 +45,7 @@
             <option value="unofficial">Transcript: View Unofficial</option>
             <option value="transfer">Transfer Credit: Report</option>
           </select>
-          <a id="DERIVED_SSS_SCL_SSS_GO_1" href="#academic-go" onclick="document.body.dataset.academicAction=document.querySelector('#academic-tools').value"><span aria-hidden="true">»</span></a>
+          <div id="win0divDERIVED_SSS_SCL_SSS_GO_1"><a name="DERIVED_SSS_SCL_SSS_GO_1" id="DERIVED_SSS_SCL_SSS_GO_1" onclick="javascript:cancelBubble(event);" href="javascript:submitAction_win0(document.win0,'DERIVED_SSS_SCL_SSS_GO_1');"><img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" id="DERIVED_SSS_SCL_SSS_GO_1$IMG" alt="Go" title="Go" /></a></div>
           <a href="#deadlines">Deadlines</a>
           <h3>This Week's Schedule</h3>
           <table>
@@ -102,6 +102,14 @@
     </div>
 
     <div id="scu-extension-root"></div>
+    <script>
+      document.win0 = {};
+      function cancelBubble(event) { event.stopPropagation(); }
+      function submitAction_win0(form, id) {
+        document.body.dataset.peopleSoftAction = id;
+        document.body.dataset.academicAction = document.querySelector("#academic-tools").value;
+      }
+    </script>
     <script src="../src/content/schedule.js"></script>
     <script src="../src/content/homepage-data.js"></script>
     <script src="../src/content/enrollment.js"></script>

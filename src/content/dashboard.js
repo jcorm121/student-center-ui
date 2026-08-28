@@ -411,8 +411,15 @@
     return { label, select, items };
   }
 
-  function findSelectTrigger(select) {
+  function findSelectTrigger(select, menuLabel = "") {
     const sourceDocument = select.ownerDocument;
+    const exactTriggerIds = {
+      "Other Academic Information": "DERIVED_SSS_SCL_SSS_GO_1"
+    };
+    const exactTriggerId = exactTriggerIds[menuLabel];
+    const exactTrigger = exactTriggerId ? sourceDocument.getElementById(exactTriggerId) : null;
+    if (exactTrigger) return exactTrigger;
+
     const selector = "a, button, input[type='button'], input[type='image'], input[type='submit']";
     const likelyTriggers = [...sourceDocument.querySelectorAll(selector)].filter((candidate) => {
       if (candidate.closest(`#${ROOT_ID}`)) return false;
@@ -473,12 +480,13 @@
   function invokeSelectItem(menu, item) {
     const option = [...menu.select.options].find((candidate) => candidate.value === item.value);
     if (!option) return;
-    const trigger = findSelectTrigger(menu.select);
+    const trigger = findSelectTrigger(menu.select, menu.label);
     menu.select.selectedIndex = option.index;
     const EventConstructor = menu.select.ownerDocument.defaultView.Event;
     menu.select.dispatchEvent(new EventConstructor("input", { bubbles: true }));
     menu.select.dispatchEvent(new EventConstructor("change", { bubbles: true }));
-    trigger?.click();
+    const clickTarget = trigger?.querySelector?.("img") ?? trigger;
+    clickTarget?.click();
   }
 
   function friendlyToolLabel(label) {
