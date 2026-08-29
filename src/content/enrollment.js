@@ -50,6 +50,44 @@
     };
   }
 
+  function parseRelatedRequirement(value) {
+    const text = String(value ?? "").replace(/\s+/g, " ").trim();
+    return text.match(/^Select\s+(.+?)\s+section\s*\(Required\)\s*:?$/i)?.[1]?.trim() ?? "";
+  }
+
+  function parseSelectedSectionSummary(value, courseCode) {
+    const text = String(value ?? "").replace(/\s+/g, " ").trim();
+    const match = text.match(
+      /\b(Lecture|Discussion|Lab|Project)\s+selected\s+Section\s+(\d{3})\s+((?:(?:Mo|Tu|We|Th|Fr|Sa|Su))+\s+\d{1,2}:\d{2}\s*[AP]M\s*-\s*\d{1,2}:\d{2}\s*[AP]M)\s+(.+)$/i
+    );
+    if (!match || !courseCode) return null;
+    const component = {
+      lecture: "LEC",
+      discussion: "DIS",
+      lab: "LAB",
+      project: "PRJ"
+    }[match[1].toLowerCase()] ?? "";
+    const location = match[4].replace(/\s+(?:Open|Closed|Wait List)\b.*$/i, "").trim();
+    return {
+      courseText: `${courseCode}-${match[2]} ${component}`.trim(),
+      scheduleText: `${match[3]} ${location}`.trim(),
+      statusText: "Selected for enrollment",
+      dropped: false
+    };
+  }
+
+  function mergeSelectedScheduleRows(rows, selectedRow) {
+    const current = Array.isArray(rows) ? rows : [];
+    if (!selectedRow) return [...current];
+    const rowId = (row) => {
+      const match = String(row?.courseText ?? "").match(/\b([A-Z&]{2,8})\s*(\d{3,4})-(\d{3})\b/i);
+      return match ? `${match[1].toUpperCase()} ${match[2]}-${match[3]}` : "";
+    };
+    const selectedId = rowId(selectedRow);
+    if (selectedId && current.some((row) => rowId(row) === selectedId)) return [...current];
+    return [...current, selectedRow];
+  }
+
   function normalizeAvailability(value) {
     const text = String(value ?? "").replace(/\s+/g, " ").trim();
     if (/wait\s*list/i.test(text)) return "Wait list";
@@ -62,11 +100,14 @@
     return first?.day === second?.day && first.start < second.end && second.start < first.end;
   }
 
-  function conflictingCourses(candidateMeetings, enrolledMeetings) {
+  function conflictingCourses(candidateMeetings, enrolledMeetings, ignoredCodes = []) {
+    const ignored = new Set(ignoredCodes);
     const codes = new Set();
     candidateMeetings.forEach((candidate) => {
       enrolledMeetings.forEach((enrolled) => {
-        if (meetingsOverlap(candidate, enrolled)) codes.add(enrolled.code);
+        if (meetingsOverlap(candidate, enrolled) && !ignored.has(enrolled.code)) {
+          codes.add(enrolled.code);
+        }
       });
     });
     return [...codes];
@@ -76,9 +117,12 @@
   globalThis.SCU.enrollment = {
     conflictingCourses,
     meetingsOverlap,
+    mergeSelectedScheduleRows,
     normalizeAvailability,
     optionMatchesSubject,
     parseClassQuery,
+    parseRelatedRequirement,
+    parseSelectedSectionSummary,
     parseSectionLabel
   };
 })();

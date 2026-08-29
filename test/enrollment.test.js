@@ -5,9 +5,12 @@ require("../src/content/enrollment.js");
 const {
   conflictingCourses,
   meetingsOverlap,
+  mergeSelectedScheduleRows,
   normalizeAvailability,
   optionMatchesSubject,
   parseClassQuery,
+  parseRelatedRequirement,
+  parseSelectedSectionSummary,
   parseSectionLabel
 } = globalThis.SCU.enrollment;
 
@@ -45,6 +48,36 @@ assert.deepEqual(parseSectionLabel("001-LEC Regular"), {
 assert.equal(parseSectionLabel("201-DIS Regular").type, "Discussion");
 assert.equal(parseSectionLabel("801-SEM Regular").type, "");
 
+assert.equal(parseRelatedRequirement("Select Discussion section (Required):"), "Discussion");
+assert.equal(
+  parseRelatedRequirement("Choose a classes to add - related class sections Fall 2026"),
+  ""
+);
+assert.deepEqual(
+  parseSelectedSectionSummary(
+    "Lecture selected Section 001 MoWeFr 1:25PM - 2:15PM Baker Laboratory 200",
+    "CS 3110"
+  ),
+  {
+    courseText: "CS 3110-001 LEC",
+    scheduleText: "MoWeFr 1:25PM - 2:15PM Baker Laboratory 200",
+    statusText: "Selected for enrollment",
+    dropped: false
+  }
+);
+const cachedRows = [
+  { courseText: "MATH 2940-002 LEC (11567)", scheduleText: "MoWeFr 12:20PM - 1:10PM" }
+];
+const selectedLecture = parseSelectedSectionSummary(
+  "Lecture selected Section 001 MoWeFr 1:25PM - 2:15PM Baker Laboratory 200",
+  "CS 3110"
+);
+assert.deepEqual(mergeSelectedScheduleRows(cachedRows, selectedLecture), [...cachedRows, selectedLecture]);
+assert.deepEqual(
+  mergeSelectedScheduleRows([...cachedRows, selectedLecture], selectedLecture),
+  [...cachedRows, selectedLecture]
+);
+
 assert.equal(normalizeAvailability("Status: Open"), "Open");
 assert.equal(normalizeAvailability("Wait List"), "Wait list");
 assert.equal(normalizeAvailability(""), "Unknown");
@@ -53,5 +86,9 @@ const enrolled = [{ code: "MATH 2940", day: "Mo", start: 795, end: 850 }];
 const candidate = [{ code: "CS 3110", day: "Mo", start: 795, end: 855 }];
 assert.equal(meetingsOverlap(candidate[0], enrolled[0]), true);
 assert.deepEqual(conflictingCourses(candidate, enrolled), ["MATH 2940"]);
+assert.deepEqual(
+  conflictingCourses(candidate, [...enrolled, { code: "CS 3110", day: "Mo", start: 780, end: 900 }], ["CS 3110"]),
+  ["MATH 2940"]
+);
 
 console.log("enrollment helper tests passed");

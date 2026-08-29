@@ -807,6 +807,39 @@
     return findCourseHeading(table);
   }
 
+  function relatedRequirement() {
+    const candidates = sourceDocuments.flatMap((sourceDocument) => {
+      return [...sourceDocument.querySelectorAll("h1, h2, h3, h4, h5, legend, td, div, span")]
+        .filter((element) => !element.closest(`#${ROOT_ID}`));
+    });
+
+    for (const candidate of candidates) {
+      const text = ownLabel(candidate);
+      if (text.length > 140) continue;
+      const requirement = globalThis.SCU.enrollment.parseRelatedRequirement(text);
+      if (requirement) return requirement;
+    }
+
+    return "related";
+  }
+
+  function selectedRelatedSectionRow(course) {
+    const candidates = sourceDocuments.flatMap((sourceDocument) => {
+      return [...sourceDocument.querySelectorAll("p, tr, td, div")]
+        .filter((element) => !element.closest(`#${ROOT_ID}`))
+        .map((element) => ownLabel(element))
+        .filter((text) => /\b(?:Lecture|Discussion|Lab|Project)\s+selected\b/i.test(text))
+        .filter((text) => text.length < 320);
+    }).sort((first, second) => first.length - second.length);
+
+    for (const text of candidates) {
+      const selectedRow = globalThis.SCU.enrollment.parseSelectedSectionSummary(text, course.code);
+      if (selectedRow) return selectedRow;
+    }
+
+    return null;
+  }
+
   function extractRelatedSections() {
     const table = findRelatedSectionsTable();
     if (!table) return null;
@@ -820,7 +853,7 @@
 
     const labels = [...header.cells].map((cell) => ownLabel(cell).toLowerCase());
     const indexOf = (label) => labels.indexOf(label);
-    const requirement = sourceText().match(/Select\s+(.+?)\s+section\s*\(Required\)/i)?.[1] ?? "related";
+    const requirement = relatedRequirement();
     const course = relatedCourse(table);
     const sections = rows.slice(rows.indexOf(header) + 1).map((row) => {
       const radio = row.querySelector("input[type='radio']");
@@ -856,6 +889,7 @@
     return {
       course,
       requirement: normalize(requirement),
+      selectedRow: selectedRelatedSectionRow(course),
       sections,
       viewAll: findAction("View All"),
       cancel: findAction("Cancel"),
@@ -1323,7 +1357,7 @@
     eyebrow.className = "scu-eyebrow";
     eyebrow.textContent = related.course.code;
     const headingText = document.createElement("h2");
-    headingText.textContent = `Choose a ${related.requirement.toLowerCase()}`;
+    headingText.textContent = `Choose a ${related.requirement.toLowerCase()} section`;
     title.append(eyebrow, headingText);
     heading.append(title);
 
@@ -1354,7 +1388,11 @@
     continueButton.addEventListener("click", () => invokeOriginal(related.next));
 
     related.sections.forEach((section) => {
-      const conflicts = globalThis.SCU.enrollment.conflictingCourses(section.meetings, schedule.meetings);
+      const conflicts = globalThis.SCU.enrollment.conflictingCourses(
+        section.meetings,
+        schedule.meetings,
+        [related.course.code]
+      );
       const option = document.createElement("button");
       option.type = "button";
       option.className = "scu-related-option";
@@ -1445,25 +1483,30 @@
     const count = document.createElement("span");
     count.className = "scu-count-pill";
     count.textContent = `${schedule.courses.length} ${schedule.courses.length === 1 ? "course" : "courses"}`;
-    const addButton = document.createElement("button");
-    addButton.type = "button";
-    addButton.className = "scu-add-class-button";
-    addButton.append(createIcon("plus"), "Add classes");
-    actions.append(count, addButton);
+    actions.append(count);
     heading.append(actions);
-    const searchPanel = createSearchPanel(kind);
-    addButton.addEventListener("click", () => {
-      if (kind !== "class-search") {
-        addButton.disabled = true;
-        addButton.replaceChildren(createIcon("plus"), "Opening search…");
-        beginAdvancedEnrollmentSearch();
-        return;
-      }
+    card.append(heading);
 
-      searchPanel.hidden = false;
-      searchPanel.querySelector("select, input")?.focus();
-    });
-    card.append(heading, searchPanel);
+    if (kind !== "related-sections") {
+      const addButton = document.createElement("button");
+      addButton.type = "button";
+      addButton.className = "scu-add-class-button";
+      addButton.append(createIcon("plus"), "Add classes");
+      actions.append(addButton);
+      const searchPanel = createSearchPanel(kind);
+      addButton.addEventListener("click", () => {
+        if (kind !== "class-search") {
+          addButton.disabled = true;
+          addButton.replaceChildren(createIcon("plus"), "Opening search…");
+          beginAdvancedEnrollmentSearch();
+          return;
+        }
+
+        searchPanel.hidden = false;
+        searchPanel.querySelector("select, input")?.focus();
+      });
+      card.append(searchPanel);
+    }
 
     if (!schedule.meetings.length) {
       const empty = document.createElement("div");
@@ -1966,14 +2009,19 @@
       return false;
     }
 
-    let rows = table ? extractRows(table) : [];
-    if (kind === "home" || kind === "add-classes") cacheScheduleRows(rows);
-    if (kind !== "home" && (!rows.length || kind === "class-results")) {
-      rows = cachedScheduleRows();
-    }
     const searchResults = kind === "class-results" ? extractSearchResults() : [];
     const relatedSections = kind === "related-sections" ? extractRelatedSections() : null;
     const emptySearchResults = kind === "class-search" && hasEmptySearchResults();
+    let rows = table ? extractRows(table) : [];
+    if (kind === "home" || kind === "add-classes") cacheScheduleRows(rows);
+    if (kind === "related-sections") {
+      rows = globalThis.SCU.enrollment.mergeSelectedScheduleRows(
+        cachedScheduleRows(),
+        relatedSections?.selectedRow
+      );
+    } else if (kind !== "home" && (!rows.length || kind === "class-results")) {
+      rows = cachedScheduleRows();
+    }
 
     if (kind === "home" && !rows.length) {
       if (root) {
