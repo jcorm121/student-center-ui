@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en" class="scu-extension-enabled" data-scu-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Related Lecture Sections fixture</title>
+    <link rel="stylesheet" href="../src/content/styles.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Enrollment: Add Classes</h1>
+      <h2>1. Select classes to add - Enrollment Section</h2>
+      <p>Fall 2026 | Undergraduate | Cornell University</p>
+      <h3>CS 3110 - Functional Programming and Data Structures</h3>
+      <p><strong>Discussion selected</strong> Section 201 Mo 2:55PM - 4:10PM Hollister Hall 306</p>
+      <table>
+        <thead>
+          <tr><th></th><th>Class Nbr</th><th>Section</th><th>Component</th><th>Schedule</th><th>Room</th><th>Instructor</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><input name="related" type="radio" /></td><td>17297</td><td>001</td><td>Lecture</td><td>MoWeFr 1:25PM - 2:15PM</td><td>Baker Laboratory 200</td><td>M. Clarkson</td><td><img alt="Open" /></td></tr>
+          <tr><td><input name="related" type="radio" /></td><td>17307</td><td>002</td><td>Lecture</td><td>TuTh 10:10AM - 11:25AM</td><td>Gates Hall G01</td><td>M. Clarkson</td><td><img alt="Wait List" /></td></tr>
+        </tbody>
+      </table>
+      <input type="button" value="Cancel" onclick="document.body.dataset.action='cancel'" />
+      <input type="button" value="Next" onclick="document.body.dataset.action='next'" />
+    </main>
+    <div id="scu-extension-root"></div>
+    <script>
+      sessionStorage.setItem("scu-schedule-cache-v2", JSON.stringify([
+        { courseText: "MATH 2940-002 LEC (11567)", scheduleText: "MoWeFr 12:20PM - 1:10PM Klarman Hall KG70", statusText: "Enrolled" }
+      ]));
+    </script>
+    <script src="../src/content/schedule.js"></script>
+    <script src="../src/content/homepage-data.js"></script>
+    <script src="../src/content/enrollment.js"></script>
+    <script src="../src/content/dashboard.js"></script>
+    <script>globalThis.SCU.dashboard.refresh();</script>
+  </body>
+</html>

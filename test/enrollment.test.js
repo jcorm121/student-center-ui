@@ -65,6 +65,18 @@ assert.deepEqual(
     dropped: false
   }
 );
+assert.deepEqual(
+  parseSelectedSectionSummary(
+    "Discussion selected Section 201 Mo 2:55PM - 4:10PM Hollister Hall 306",
+    "CS 3110"
+  ),
+  {
+    courseText: "CS 3110-201 DIS",
+    scheduleText: "Mo 2:55PM - 4:10PM Hollister Hall 306",
+    statusText: "Selected for enrollment",
+    dropped: false
+  }
+);
 const cachedRows = [
   { courseText: "MATH 2940-002 LEC (11567)", scheduleText: "MoWeFr 12:20PM - 1:10PM" }
 ];

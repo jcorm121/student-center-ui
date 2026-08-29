@@ -100,9 +100,7 @@
 
   function pageKind() {
     const text = sourceText();
-    if (/Select\s+.+?\s+section\s*\(Required\)/i.test(text) && findRelatedSectionsTable()) {
-      return "related-sections";
-    }
+    if (findRelatedSectionsTable()) return "related-sections";
     if (
       /Search Results|class section\(s\) found/i.test(text) &&
       findSourceElement("input[id^='SSR_PB_SELECT$']")
@@ -820,7 +818,7 @@
       if (requirement) return requirement;
     }
 
-    return "related";
+    return "";
   }
 
   function selectedRelatedSectionRow(course) {
@@ -853,7 +851,7 @@
 
     const labels = [...header.cells].map((cell) => ownLabel(cell).toLowerCase());
     const indexOf = (label) => labels.indexOf(label);
-    const requirement = relatedRequirement();
+    const explicitRequirement = relatedRequirement();
     const course = relatedCourse(table);
     const sections = rows.slice(rows.indexOf(header) + 1).map((row) => {
       const radio = row.querySelector("input[type='radio']");
@@ -874,8 +872,8 @@
         key: `${classNumber}|${sectionLabel}`,
         classNumber,
         section: parsedSection.section || sectionLabel,
-        component: parsedSection.component,
-        type: parsedSection.type,
+        component: parsedSection.component || valueAt("component"),
+        type: parsedSection.type || valueAt("component"),
         scheduleText,
         room,
         instructor: valueAt("instructor"),
@@ -885,10 +883,13 @@
         selected: radio.checked
       };
     }).filter(Boolean);
+    const inferredRequirement = sections
+      .map((section) => section.type || section.component)
+      .find(Boolean);
 
     return {
       course,
-      requirement: normalize(requirement),
+      requirement: normalize(explicitRequirement || inferredRequirement || "related"),
       selectedRow: selectedRelatedSectionRow(course),
       sections,
       viewAll: findAction("View All"),
