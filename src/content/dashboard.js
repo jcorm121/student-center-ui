@@ -4,6 +4,7 @@
   const SCHEDULE_CACHE_KEY = "scu-schedule-cache-v2";
   const SEARCH_CACHE_KEY = "scu-pending-class-search-v1";
   const PAGE_ACTION_EVENT = "scu:invoke-page-action";
+  const PAGE_SUBMIT_EVENT = "scu:submit-people-soft-action";
   const ACTION_LABELS = ["Search", "Plan", "Enroll", "My Academics"];
   const COLORS = ["blue", "violet", "teal", "orange", "rose", "indigo"];
   let lastSignature = "";
@@ -358,6 +359,17 @@
     const handledInPage = !element.dispatchEvent(event);
     if (!handledInPage) element.click();
     return true;
+  }
+
+  function submitPeopleSoftAction(sourceDocument, actionId) {
+    if (!sourceDocument || !actionId) return false;
+    const EventConstructor = sourceDocument.defaultView.CustomEvent;
+    const event = new EventConstructor(PAGE_SUBMIT_EVENT, {
+      bubbles: false,
+      cancelable: true,
+      detail: { actionId }
+    });
+    return !sourceDocument.dispatchEvent(event);
   }
 
   function createActionButton(label, options = {}) {
@@ -761,6 +773,10 @@
         const statusIndex = indexOf("status");
         const select = [...row.querySelectorAll("a, button, input[type='button'], input[type='submit']")]
           .find((candidate) => ownLabel(candidate).toLowerCase() === "select") ?? null;
+        const indexedResultLink = row.querySelector(
+          'a[id^="MTG_CLASS_NBR$"], a[id^="MTG_CLASSNAME$"]'
+        );
+        const resultIndex = indexedResultLink?.id.match(/\$(\d+)$/)?.[1] ?? "";
         const courseText = `${course.code}-${section.section}`;
         const courseData = globalThis.SCU.schedule.parseCourse(courseText);
         const meetings = globalThis.SCU.schedule.parseMeetings(`${daysTimes} ${room}`, courseData);
@@ -780,7 +796,9 @@
           meetingDates: valueAt("meeting dates"),
           status: resultStatus(statusIndex >= 0 ? row.cells[statusIndex] : null),
           meetings,
-          select
+          select,
+          selectActionId: select ? "" : resultIndex ? `SSR_PB_SELECT$${resultIndex}` : "",
+          sourceDocument: row.ownerDocument
         });
       });
     });
@@ -1280,20 +1298,17 @@
         const identity = document.createElement("div");
         identity.className = "scu-result-identity";
         const type = document.createElement("strong");
-        type.textContent = result.type || result.component || "Section";
-        const section = document.createElement("span");
-        section.textContent = result.section ? `Section ${result.section}` : result.sectionLabel;
-        const classNumber = document.createElement("small");
-        classNumber.textContent = `Class #${result.classNumber}`;
-        identity.append(type, section, classNumber);
+        const sectionType = result.type || result.component || "Section";
+        type.textContent = [sectionType, result.section].filter(Boolean).join(" ");
+        const location = document.createElement("span");
+        location.textContent = result.room || "Location TBA";
+        const time = document.createElement("small");
+        time.textContent = result.daysTimes || "Time TBA";
+        identity.append(type, location, time);
 
         const details = document.createElement("div");
         details.className = "scu-result-details";
-        details.append(
-          createResultDetail("When", result.daysTimes),
-          createResultDetail("Where", result.room),
-          createResultDetail("Instructor", result.instructor)
-        );
+        details.append(createResultDetail("Instructor", result.instructor));
 
         const availability = document.createElement("div");
         availability.className = "scu-result-availability";
@@ -1311,9 +1326,15 @@
         const select = document.createElement("button");
         select.type = "button";
         select.className = "scu-primary-button scu-select-section";
-        select.textContent = result.select ? "Select section" : "Selection unavailable";
-        select.disabled = !result.select;
-        select.addEventListener("click", () => invokeOriginal(result.select));
+        select.textContent = "Select section";
+        select.disabled = !result.select && !result.selectActionId;
+        select.addEventListener("click", () => {
+          if (result.select) {
+            invokeOriginal(result.select);
+            return;
+          }
+          submitPeopleSoftAction(result.sourceDocument, result.selectActionId);
+        });
 
         item.append(identity, details, availability, select);
         list.append(item);
