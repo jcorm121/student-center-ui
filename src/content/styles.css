@@ -245,7 +245,7 @@
 
 .scu-search-loading-stage {
   display: grid;
-  min-height: 320px;
+  min-height: 210px;
   place-items: center;
   align-content: center;
   gap: 14px;
@@ -298,7 +298,7 @@
 
 .scu-search-loading-skeleton {
   display: grid;
-  width: min(100%, 230px);
+  width: min(100%, 360px);
   gap: 8px;
   margin-top: 8px;
 }
