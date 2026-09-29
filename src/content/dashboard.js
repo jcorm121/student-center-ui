@@ -1245,6 +1245,30 @@
   function clearCalendarPreview() {
     document.querySelectorAll(`#${ROOT_ID} .scu-calendar-event--preview`)
       .forEach((event) => event.remove());
+    document.querySelectorAll(`#${ROOT_ID} .scu-calendar-event--shared`)
+      .forEach((event) => {
+        event.classList.remove("scu-calendar-event--shared");
+        event.style.removeProperty("left");
+        event.style.removeProperty("right");
+        event.style.removeProperty("width");
+      });
+  }
+
+  function shareCalendarColumn(events) {
+    if (events.length < 2) return;
+    const gap = 2;
+    const inset = 3;
+    const reservedPixels = inset * 2 + gap * (events.length - 1);
+
+    events.forEach((event, index) => {
+      const widthPercent = 100 / events.length;
+      const widthPixels = reservedPixels / events.length;
+      const leftPixels = inset + index * gap - index * widthPixels;
+      event.classList.add("scu-calendar-event--shared");
+      event.style.left = `calc(${index * widthPercent}% + ${leftPixels}px)`;
+      event.style.right = "auto";
+      event.style.width = `calc(${widthPercent}% - ${widthPixels}px)`;
+    });
   }
 
   function showCalendarPreview(result) {
@@ -1259,10 +1283,17 @@
       const column = [...calendar.querySelectorAll(".scu-day-column")]
         .find((candidate) => candidate.dataset.day === meeting.day);
       if (!column) return;
-      column.append(createCalendarEvent(meeting, startMinute, {
+      const preview = createCalendarEvent(meeting, startMinute, {
         preview: true,
         sectionLabel
-      }));
+      });
+      const exactMatches = [...column.querySelectorAll(".scu-calendar-event:not(.scu-calendar-event--preview)")]
+        .filter((event) => {
+          return Number(event.dataset.start) === meeting.start &&
+            Number(event.dataset.end) === meeting.end;
+        });
+      column.append(preview);
+      shareCalendarColumn([...exactMatches, preview]);
     });
   }
 
@@ -1557,6 +1588,8 @@
     }
     event.style.setProperty("--scu-event-start", meeting.start - startMinute);
     event.style.setProperty("--scu-event-duration", meeting.end - meeting.start);
+    event.dataset.start = String(meeting.start);
+    event.dataset.end = String(meeting.end);
     const timeRange = `${globalThis.SCU.schedule.formatClock(meeting.start)}–${globalThis.SCU.schedule.formatClock(meeting.end)}`;
     event.title = `${options.preview ? "Preview: " : ""}${meeting.code}, ${timeRange}${meeting.location ? `, ${meeting.location}` : ""}`;
 

@@ -844,6 +844,15 @@
   text-transform: uppercase;
 }
 
+.scu-calendar-event--shared {
+  padding-right: 5px;
+  padding-left: 5px;
+}
+
+.scu-calendar-event--preview.scu-calendar-event--shared::after {
+  display: none;
+}
+
 .scu-unscheduled {
   display: flex;
   align-items: center;
