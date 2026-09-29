@@ -101,10 +101,9 @@
   function pageKind() {
     const text = sourceText();
     if (findRelatedSectionsTable()) return "related-sections";
-    if (
-      /Search Results|class section\(s\) found/i.test(text) &&
-      findSourceElement("input[id^='SSR_PB_SELECT$']")
-    ) return "class-results";
+    if (/Search Results|class section\(s\) found/i.test(text) && hasClassResultsTable()) {
+      return "class-results";
+    }
     if (findPeopleSoftControl("input", "CLASS_SRCH_WRK2_SSR_PB_CLASS_SRCH")) return "class-search";
     if (
       findPeopleSoftControl("input", "DERIVED_REGFRM1_SSR_PB_SRCH") ||
@@ -709,6 +708,19 @@
     return globalThis.SCU.enrollment.normalizeAvailability(statusMetadata(statusCell));
   }
 
+  function hasClassResultsTable() {
+    return sourceDocuments.some((sourceDocument) => {
+      return [...sourceDocument.querySelectorAll("table")]
+        .filter((table) => !table.closest(`#${ROOT_ID}`))
+        .some((table) => {
+          return [...table.rows].some((row) => {
+            const labels = [...row.cells].map((cell) => ownLabel(cell).toLowerCase());
+            return globalThis.SCU.enrollment.isClassResultsHeader(labels);
+          });
+        });
+    });
+  }
+
   function extractSearchResults() {
     const results = [];
     const seen = new Set();
@@ -723,8 +735,7 @@
       const rows = [...table.rows];
       const header = rows.find((row) => {
         const labels = [...row.cells].map((cell) => ownLabel(cell).toLowerCase());
-        return labels.includes("class") && labels.includes("section") &&
-          labels.includes("days & times") && labels.includes("room") && labels.includes("status");
+        return globalThis.SCU.enrollment.isClassResultsHeader(labels);
       });
       if (!header) return;
 
@@ -1300,7 +1311,7 @@
         const select = document.createElement("button");
         select.type = "button";
         select.className = "scu-primary-button scu-select-section";
-        select.textContent = "Select section";
+        select.textContent = result.select ? "Select section" : "Selection unavailable";
         select.disabled = !result.select;
         select.addEventListener("click", () => invokeOriginal(result.select));
 

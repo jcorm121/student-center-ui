@@ -50,6 +50,14 @@
     };
   }
 
+  function isClassResultsHeader(labels) {
+    const normalized = (Array.isArray(labels) ? labels : [])
+      .map((label) => String(label ?? "").replace(/\s+/g, " ").trim().toLowerCase());
+    return normalized.includes("class") && normalized.includes("section") &&
+      normalized.includes("days & times") && normalized.includes("room") &&
+      normalized.includes("status");
+  }
+
   function parseRelatedRequirement(value) {
     const text = String(value ?? "").replace(/\s+/g, " ").trim();
     return text.match(/^Select\s+(.+?)\s+section\s*\(Required\)\s*:?$/i)?.[1]?.trim() ?? "";
@@ -116,6 +124,7 @@
   globalThis.SCU = globalThis.SCU || {};
   globalThis.SCU.enrollment = {
     conflictingCourses,
+    isClassResultsHeader,
     meetingsOverlap,
     mergeSelectedScheduleRows,
     normalizeAvailability,

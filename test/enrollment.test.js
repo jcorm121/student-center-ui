@@ -4,6 +4,7 @@ require("../src/content/enrollment.js");
 
 const {
   conflictingCourses,
+  isClassResultsHeader,
   meetingsOverlap,
   mergeSelectedScheduleRows,
   normalizeAvailability,
@@ -47,6 +48,11 @@ assert.deepEqual(parseSectionLabel("001-LEC Regular"), {
 });
 assert.equal(parseSectionLabel("201-DIS Regular").type, "Discussion");
 assert.equal(parseSectionLabel("801-SEM Regular").type, "");
+assert.equal(
+  isClassResultsHeader(["Class", "Section", "Days & Times", "Room", "Instructor", "Meeting Dates", "Status"]),
+  true
+);
+assert.equal(isClassResultsHeader(["Class Nbr", "Section", "Schedule", "Room", "Status"]), false);
 
 assert.equal(parseRelatedRequirement("Select Discussion section (Required):"), "Discussion");
 assert.equal(
