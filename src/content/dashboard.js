@@ -1456,6 +1456,71 @@
     container.append(card);
   }
 
+  function renderSearchLoading(container) {
+    const card = document.createElement("section");
+    card.className = "scu-card scu-search-results-placeholder scu-search-loading-card";
+    card.setAttribute("aria-busy", "true");
+
+    const heading = document.createElement("div");
+    heading.className = "scu-card-heading";
+    heading.innerHTML = '<div><p class="scu-eyebrow">Class search</p><h2>Opening search</h2></div>';
+
+    const stage = document.createElement("div");
+    stage.className = "scu-search-loading-stage";
+    stage.setAttribute("role", "status");
+    stage.setAttribute("aria-live", "polite");
+
+    const spinner = document.createElement("div");
+    spinner.className = "scu-search-loading-spinner";
+    spinner.setAttribute("aria-hidden", "true");
+    spinner.append(createIcon("search"));
+
+    const copy = document.createElement("div");
+    copy.className = "scu-search-loading-copy";
+    const title = document.createElement("strong");
+    title.textContent = "Preparing class search";
+    const description = document.createElement("span");
+    description.textContent = "Connecting to Cornell Student Center…";
+    copy.append(title, description);
+
+    const skeleton = document.createElement("div");
+    skeleton.className = "scu-search-loading-skeleton";
+    skeleton.setAttribute("aria-hidden", "true");
+    for (let index = 0; index < 3; index += 1) {
+      const row = document.createElement("span");
+      row.innerHTML = "<i></i><i></i>";
+      skeleton.append(row);
+    }
+
+    stage.append(spinner, copy, skeleton);
+    card.append(heading, stage);
+    container.append(card);
+  }
+
+  function showSearchLoadingState() {
+    const root = document.getElementById(ROOT_ID);
+    const content = root?.querySelector(".scu-content");
+    if (!content) return;
+
+    content.classList.add("scu-content--enrollment");
+    const resultsPrimary = content.querySelector(".scu-primary-column--results");
+    if (resultsPrimary) {
+      resultsPrimary.querySelector(".scu-search-results")?.remove();
+      renderSearchLoading(resultsPrimary);
+      return;
+    }
+
+    let secondary = content.querySelector(".scu-enrollment-secondary, .scu-secondary-column");
+    if (!secondary) {
+      secondary = document.createElement("aside");
+      content.append(secondary);
+    }
+    secondary.className = "scu-enrollment-secondary";
+    secondary.setAttribute("aria-label", "Loading class search");
+    secondary.replaceChildren();
+    renderSearchLoading(secondary);
+  }
+
   function renderRelatedSections(container, related, schedule) {
     const card = document.createElement("section");
     card.className = "scu-card scu-related-sections";
@@ -1637,7 +1702,13 @@
         if (kind !== "class-search") {
           addButton.disabled = true;
           addButton.replaceChildren(createIcon("plus"), "Opening search…");
-          beginAdvancedEnrollmentSearch();
+          showSearchLoadingState();
+          const beginSearch = () => beginAdvancedEnrollmentSearch();
+          if (typeof window.requestAnimationFrame === "function") {
+            window.requestAnimationFrame(() => window.requestAnimationFrame(beginSearch));
+          } else {
+            window.setTimeout(beginSearch, 0);
+          }
           return;
         }
 
@@ -2064,7 +2135,11 @@
       const secondary = document.createElement("aside");
       secondary.className = "scu-enrollment-secondary";
       secondary.setAttribute("aria-label", "Class search results");
-      renderSearchResultsPlaceholder(secondary, kind === "class-search" && hasEmptySearchResults());
+      if (kind === "add-classes" && pendingSearch()?.mode === "advanced") {
+        renderSearchLoading(secondary);
+      } else {
+        renderSearchResultsPlaceholder(secondary, kind === "class-search" && hasEmptySearchResults());
+      }
       content.append(secondary);
     } else if (kind === "related-sections" && relatedSections) {
       const secondary = document.createElement("aside");
