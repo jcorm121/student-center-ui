@@ -812,6 +812,38 @@
 .scu-calendar-event--rose { --event-color: #e24872; }
 .scu-calendar-event--indigo { --event-color: #4f5bd5; }
 
+.scu-calendar-event--preview {
+  z-index: 4;
+  pointer-events: none;
+  border: 2px dashed var(--event-color);
+  border-left-width: 4px;
+  background:
+    repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--event-color) 16%, var(--scu-surface)) 0,
+      color-mix(in srgb, var(--event-color) 16%, var(--scu-surface)) 7px,
+      color-mix(in srgb, var(--event-color) 6%, var(--scu-surface)) 7px,
+      color-mix(in srgb, var(--event-color) 6%, var(--scu-surface)) 14px
+    );
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--event-color) 24%, transparent);
+  opacity: 0.9;
+}
+
+.scu-calendar-event--preview::after {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  color: var(--event-color);
+  background: color-mix(in srgb, var(--scu-surface) 88%, transparent);
+  content: "Preview";
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .scu-unscheduled {
   display: flex;
   align-items: center;

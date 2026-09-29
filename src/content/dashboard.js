@@ -708,6 +708,21 @@
       current = current.parentElement;
     }
 
+    const headingCandidates = [...table.ownerDocument.querySelectorAll(
+      '[id^="SSR_CLSRSLT_WRK_GROUPBOX2"], [id^="win0divSSR_CLSRSLT_WRK_GROUPBOX2"], h1, h2, h3'
+    )].sort((first, second) => ownLabel(first).length - ownLabel(second).length);
+    for (const candidate of headingCandidates) {
+      const match = ownLabel(candidate).match(pattern);
+      if (match) {
+        return {
+          code: normalize(match[1]).toUpperCase(),
+          title: normalize(match[2])
+            .replace(/\s+Collapsible section.*$/i, "")
+            .replace(/\s+(?:Class|Section|Days & Times).*$/i, "")
+        };
+      }
+    }
+
     const query = globalThis.SCU.enrollment.parseClassQuery(pendingSearch()?.query ?? "");
     return {
       code: query.subject && query.courseNumber ? `${query.subject} ${query.courseNumber}` : "Course",
@@ -1227,6 +1242,30 @@
     return detail;
   }
 
+  function clearCalendarPreview() {
+    document.querySelectorAll(`#${ROOT_ID} .scu-calendar-event--preview`)
+      .forEach((event) => event.remove());
+  }
+
+  function showCalendarPreview(result) {
+    clearCalendarPreview();
+    const calendar = document.querySelector(`#${ROOT_ID} .scu-calendar`);
+    if (!calendar || !result.meetings.length) return;
+
+    const startMinute = Number(calendar.dataset.startMinute);
+    const sectionType = result.type || result.component || "Section";
+    const sectionLabel = [sectionType, result.section].filter(Boolean).join(" ");
+    result.meetings.forEach((meeting) => {
+      const column = [...calendar.querySelectorAll(".scu-day-column")]
+        .find((candidate) => candidate.dataset.day === meeting.day);
+      if (!column) return;
+      column.append(createCalendarEvent(meeting, startMinute, {
+        preview: true,
+        sectionLabel
+      }));
+    });
+  }
+
   function renderSearchResults(container, results, schedule) {
     const card = document.createElement("section");
     card.id = "scu-search-results";
@@ -1294,6 +1333,13 @@
         const conflicts = globalThis.SCU.enrollment.conflictingCourses(result.meetings, schedule.meetings);
         const item = document.createElement("article");
         item.className = "scu-result-item";
+        const preview = () => showCalendarPreview(result);
+        item.addEventListener("pointerenter", preview);
+        item.addEventListener("pointerleave", clearCalendarPreview);
+        item.addEventListener("focusin", preview);
+        item.addEventListener("focusout", (event) => {
+          if (!item.contains(event.relatedTarget)) clearCalendarPreview();
+        });
 
         const identity = document.createElement("div");
         identity.className = "scu-result-identity";
@@ -1502,7 +1548,34 @@
     container.append(card);
   }
 
-  function renderCalendar(container, schedule, kind) {
+  function createCalendarEvent(meeting, startMinute, options = {}) {
+    const event = document.createElement("article");
+    event.className = `scu-calendar-event scu-calendar-event--${colorFor(meeting.code)}`;
+    if (options.preview) {
+      event.classList.add("scu-calendar-event--preview");
+      event.setAttribute("aria-hidden", "true");
+    }
+    event.style.setProperty("--scu-event-start", meeting.start - startMinute);
+    event.style.setProperty("--scu-event-duration", meeting.end - meeting.start);
+    const timeRange = `${globalThis.SCU.schedule.formatClock(meeting.start)}–${globalThis.SCU.schedule.formatClock(meeting.end)}`;
+    event.title = `${options.preview ? "Preview: " : ""}${meeting.code}, ${timeRange}${meeting.location ? `, ${meeting.location}` : ""}`;
+
+    const code = document.createElement("strong");
+    code.textContent = meeting.code;
+    const time = document.createElement("span");
+    const typeLabel = options.sectionLabel || meeting.type;
+    time.textContent = typeLabel ? `${typeLabel} · ${timeRange}` : timeRange;
+    event.append(code, time);
+
+    if (meeting.location) {
+      const location = document.createElement("small");
+      location.textContent = meeting.location;
+      event.append(location);
+    }
+    return event;
+  }
+
+  function renderCalendar(container, schedule, kind, previewMeetings = []) {
     const card = document.createElement("section");
     card.id = "scu-schedule";
     card.className = "scu-card scu-schedule-card";
@@ -1541,7 +1614,7 @@
       card.append(searchPanel);
     }
 
-    if (!schedule.meetings.length) {
+    if (!schedule.meetings.length && !previewMeetings.length) {
       const empty = document.createElement("div");
       empty.className = "scu-empty-state";
       empty.innerHTML = "<strong>No scheduled meeting times</strong><span>Courses with times will appear here automatically.</span>";
@@ -1554,8 +1627,17 @@
     viewport.className = "scu-calendar-viewport";
     const calendar = document.createElement("div");
     calendar.className = "scu-calendar";
-    const totalMinutes = schedule.endMinute - schedule.startMinute;
+    const previewStarts = previewMeetings.map((meeting) => meeting.start);
+    const previewEnds = previewMeetings.map((meeting) => meeting.end);
+    const startMinute = previewStarts.length
+      ? Math.min(schedule.startMinute, Math.floor(Math.min(...previewStarts) / 60) * 60)
+      : schedule.startMinute;
+    const endMinute = previewEnds.length
+      ? Math.max(schedule.endMinute, Math.ceil(Math.max(...previewEnds) / 60) * 60)
+      : schedule.endMinute;
+    const totalMinutes = endMinute - startMinute;
     const hourCount = Math.ceil(totalMinutes / 60);
+    calendar.dataset.startMinute = String(startMinute);
     calendar.style.setProperty("--scu-calendar-minutes", totalMinutes);
     calendar.style.setProperty("--scu-hour-count", hourCount);
 
@@ -1571,7 +1653,7 @@
     });
 
     for (let hour = 0; hour < hourCount; hour += 1) {
-      const minute = schedule.startMinute + hour * 60;
+      const minute = startMinute + hour * 60;
       const label = document.createElement("div");
       label.className = "scu-time-label";
       label.style.gridRow = `${hour + 2}`;
@@ -1582,29 +1664,12 @@
     schedule.dayCodes.forEach((day, dayIndex) => {
       const column = document.createElement("div");
       column.className = "scu-day-column";
+      column.dataset.day = day;
       column.style.gridColumn = `${dayIndex + 2}`;
       column.style.setProperty("--scu-hour-count", hourCount);
 
       schedule.meetings.filter((meeting) => meeting.day === day).forEach((meeting) => {
-        const event = document.createElement("article");
-        event.className = `scu-calendar-event scu-calendar-event--${colorFor(meeting.code)}`;
-        event.style.setProperty("--scu-event-start", meeting.start - schedule.startMinute);
-        event.style.setProperty("--scu-event-duration", meeting.end - meeting.start);
-        event.title = `${meeting.code}, ${globalThis.SCU.schedule.formatClock(meeting.start)}–${globalThis.SCU.schedule.formatClock(meeting.end)}${meeting.location ? `, ${meeting.location}` : ""}`;
-
-        const code = document.createElement("strong");
-        code.textContent = meeting.code;
-        const time = document.createElement("span");
-        const timeRange = `${globalThis.SCU.schedule.formatClock(meeting.start)}–${globalThis.SCU.schedule.formatClock(meeting.end)}`;
-        time.textContent = meeting.type ? `${meeting.type} · ${timeRange}` : timeRange;
-        event.append(code, time);
-
-        if (meeting.location) {
-          const location = document.createElement("small");
-          location.textContent = meeting.location;
-          event.append(location);
-        }
-        column.append(event);
+        column.append(createCalendarEvent(meeting, startMinute));
       });
 
       calendar.append(column);
@@ -1939,7 +2004,10 @@
     const primary = document.createElement("div");
     primary.className = "scu-primary-column";
     if (kind === "class-results") primary.classList.add("scu-primary-column--results");
-    renderCalendar(primary, schedule, kind);
+    const previewMeetings = kind === "class-results"
+      ? searchResults.flatMap((result) => result.meetings)
+      : [];
+    renderCalendar(primary, schedule, kind, previewMeetings);
 
     if (kind === "home") {
       renderAcademicTools(primary);
