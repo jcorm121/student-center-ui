@@ -245,12 +245,13 @@
 
 .scu-search-loading-stage {
   display: grid;
-  min-height: 210px;
-  place-items: center;
+  min-height: 140px;
+  grid-template-columns: 58px minmax(170px, 0.8fr) minmax(220px, 1.2fr);
+  align-items: center;
   align-content: center;
-  gap: 14px;
-  padding: 34px 24px;
-  text-align: center;
+  gap: 18px;
+  padding: 18px 4px;
+  text-align: left;
 }
 
 .scu-search-loading-spinner {
@@ -298,9 +299,9 @@
 
 .scu-search-loading-skeleton {
   display: grid;
-  width: min(100%, 360px);
+  width: 100%;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 0;
 }
 
 .scu-search-loading-skeleton > span {
